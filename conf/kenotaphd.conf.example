@@ -1,0 +1,8 @@
+test_filter: {
+	//interface = [ "wlan0", "wlan1", "eth0" ];
+	interface = "wlp3s0";
+	match = "ether host 48:9D:24:66:A7:97";
+	link_type = "EN10MB";
+	monitor_mode = false;
+	session_timeout = 8;
+}
