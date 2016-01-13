@@ -1,12 +1,11 @@
 /*
- * Copyright (c) 2013 - 2016, CodeWard.org
+ * Copyright (c) 2016, CodeWard.org
  */
 #ifndef _SESSION_DATA_H
 #define _SESSION_DATA_H
 
 #include <stdint.h>
 #include <pcap.h>
-#include <wordexp.h>
 
 #include "session_event.h"
 

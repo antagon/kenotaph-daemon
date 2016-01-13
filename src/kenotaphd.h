@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 - 2016, CodeWard.org
+ * Copyright (c) 2016, CodeWard.org
  */
 #ifndef _KENOTAPHD_H
 #define _KENOTAPHD_H

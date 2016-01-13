@@ -1,10 +1,9 @@
 /*
- * Copyright (c) 2013 - 2016, CodeWard.org
+ * Copyright (c) 2016, CodeWard.org
  */
 #include <stdlib.h>
 #include <string.h>
 #include <pcap.h>
-#include <wordexp.h>
 
 #include "session_data.h"
 
