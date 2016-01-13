@@ -1,14 +1,14 @@
 /*
- * Copyright (c) 2013 - 2016, CodeWard.org
+ * Copyright (c) 2016, CodeWard.org
  */
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
 
-#include "hostformat.h"
+#include "hostport_parser.h"
 
 int
-hostformat_parse (const char *str, char *hostname, char *port)
+hostport_parse (const char *str, char *hostname, char *port)
 {
 	char *semicolon_pos;
 	size_t cpy_cnt;

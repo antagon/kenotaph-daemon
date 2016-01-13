@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 - 2016, CodeWard.org
+ * Copyright (c) 2016, CodeWard.org
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,11 +19,11 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#include "config.h"
 #include "kenotaphd.h"
-#include "session_data.h"
+#include "config.h"
 #include "pathname.h"
-#include "hostformat.h"
+#include "session_data.h"
+#include "hostport_parser.h"
 
 static const unsigned int SELECT_TIMEOUT_MS = 700;
 static const unsigned int ACCEPT_MAX = 32;
@@ -123,7 +123,7 @@ main (int argc, char *argv[])
 				break;
 
 			case 't':
-				rval = hostformat_parse (optarg, opt.hostname, opt.port);
+				rval = hostport_parse (optarg, opt.hostname, opt.port);
 
 				if ( rval == -1 || strlen (opt.hostname) == 0 || strlen (opt.port) == 0 ){
 					fprintf (stderr, "%s: invalid hostname format (expects HOSTNAME:PORT)\n", argv[0]);
