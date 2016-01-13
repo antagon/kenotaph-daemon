@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013 - 2015, CodeWard.org
+# Copyright (c) 2016, CodeWard.org
 #
 
 CC = gcc
@@ -21,7 +21,7 @@ uninstall:
 clean:
 	rm -f *.o $(NAME)
 
-$(NAME): main.o config.o session_data.o pathname.o hostformat.o
+$(NAME): main.o config.o session_data.o pathname.o hostport_parser.o
 	$(CC) $(CFLAGS) $^ -o $(NAME) -lpcap -lconfig
 
 main.o: main.c
@@ -36,6 +36,6 @@ session_data.o: session_data.c session_data.h
 pathname.o: pathname.c pathname.h
 	$(CC) $(CFLAGS) -c $<
 
-hostformat.o: hostformat.c hostformat.h
+hostport_parser.o: hostport_parser.c hostport_parser.h
 	$(CC) $(CFLAGS) -c $<
 
