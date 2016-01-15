@@ -50,17 +50,17 @@ filter_set_matchrule (struct config_filter *filter, const char *rule)
 static int
 filter_set_interface (struct config_filter *filter, const char *interface)
 {
-	if ( filter->interface != NULL )
-		free (filter->interface);
+	if ( filter->iface != NULL )
+		free (filter->iface);
 
 	if ( interface == NULL ){
-		filter->interface = NULL;
+		filter->iface = NULL;
 		return 0;
 	}
 
-	filter->interface = strdup (interface);
+	filter->iface = strdup (interface);
 
-	if ( filter->interface == NULL )
+	if ( filter->iface == NULL )
 		return 1;
 	
 	return 0;
@@ -104,8 +104,8 @@ filter_destroy (struct config_filter *filter)
 		free (filter->name);
 	if ( filter->match != NULL )
 		free (filter->match);
-	if ( filter->interface != NULL )
-		free (filter->interface);
+	if ( filter->iface != NULL )
+		free (filter->iface);
 	if ( filter->link_type != NULL )
 		free (filter->link_type);
 }

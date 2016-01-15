@@ -21,7 +21,7 @@ enum
 struct config_filter
 {
 	char *name;
-	char *interface;
+	char *iface;
 	char *match;
 	char *link_type;
 	uint32_t session_timeout;
