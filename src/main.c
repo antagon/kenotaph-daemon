@@ -84,13 +84,12 @@ main (int argc, char *argv[])
 	char conf_errbuff[CONF_ERRBUF_SIZE];
 	char pcap_errbuff[PCAP_ERRBUF_SIZE];
 	struct pathname path_config;
-	struct sigaction sa;
 #ifdef DBG_AVG_LOOP_SPEED
 	clock_t clock_start;
 	double clock_avg;
 #endif
-	pid_t pid;
-	int i, c, j, rval, syslog_flags, opt_index, filter_cnt, sock, poll_len;
+	struct sigaction sa;
+	struct addrinfo *host_addr, addr_hint;
 	struct option opt_long[] = {
 		{ "", no_argument, NULL, '4' },
 		{ "", no_argument, NULL, '6' },
@@ -102,6 +101,8 @@ main (int argc, char *argv[])
 		{ "version", no_argument, NULL, 'v' },
 		{ NULL, 0, NULL, 0 }
 	};
+	pid_t pid;
+	int i, c, j, rval, syslog_flags, opt_index, opt_val, filter_cnt, sock, poll_len;
 
 	sock = -1;
 	poll_fd = NULL;
@@ -113,6 +114,10 @@ main (int argc, char *argv[])
 #endif
 
 	memset (&opt, 0, sizeof (struct option_data));
+
+	opt.ip_version = AF_UNSPEC;
+	opt.accept_max = ACCEPT_MAX;
+
 	memset (&path_config, 0, sizeof (struct pathname));
 	memset (&kenotaphd_conf, 0, sizeof (struct config));
 
@@ -131,7 +136,6 @@ main (int argc, char *argv[])
 					goto cleanup;
 				}
 
-				opt.ip_version = AF_UNSPEC;
 				opt.tcp_event = 1;
 				break;
 
@@ -174,9 +178,6 @@ main (int argc, char *argv[])
 		}
 	}
 
-	if ( opt.accept_max == 0 )
-		opt.accept_max = ACCEPT_MAX;
-
 	// Check if there are some non-option arguments, these are treated as paths
 	// to configuration files.
 	if ( (argc - optind) == 0 ){
@@ -185,11 +186,18 @@ main (int argc, char *argv[])
 		goto cleanup;
 	}
 
+	if ( opt.tcp_event == 0 ){
+		fprintf (stderr, "%s: daemon not binded to any hostname and port. Use '--help' to see usage information.\n", argv[0]);
+		kenotaphd_help (argv[0]);
+		exitno = EXIT_FAILURE;
+		goto cleanup;
+	}
+
 	// Change working directory to match the dirname of the config file.
 	rval = path_split (argv[optind], &path_config);
 
 	if ( rval != 0 ){
-		fprintf (stderr, "%s: cannot split path to configuration file.\n", argv[0]);
+		fprintf (stderr, "%s: cannot split path to a configuration file.\n", argv[0]);
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -208,10 +216,10 @@ main (int argc, char *argv[])
 	filter_cnt = config_load (&kenotaphd_conf, path_config.base, conf_errbuff);
 
 	if ( filter_cnt == -1 ){
-		fprintf (stderr, "%s: cannot load configuration file '%s': %s\n", argv[0], argv[optind], conf_errbuff);
+		fprintf (stderr, "%s: cannot load a configuration file '%s': %s\n", argv[0], argv[optind], conf_errbuff);
 		exitno = EXIT_FAILURE;
 		goto cleanup;
-	} else	if ( filter_cnt == 0 ){
+	} else if ( filter_cnt == 0 ){
 		fprintf (stderr, "%s: nothing to do, no filters defined.\n", argv[0]);
 		exitno = EXIT_FAILURE;
 		goto cleanup;
@@ -220,75 +228,63 @@ main (int argc, char *argv[])
 	// No longer needed, free the resources
 	path_free (&path_config);
 
-	// Allocate enough memory for filters (+1 means that we are also allocating
-	// space for listening socket).
-	// NOTE: always allocate space for listening socket here, to move this
-	// allocation inside the block below (where listening socket is actually
-	// allocated) is not a good idea as more complex condition would have to be
-	// used inside the main loop.
-	poll_len = filter_cnt + 1;
+	// Define a poll array length, the length includes space for all pcap fd +
+	// listening socket + accept_max number of client sockets.
+	poll_len = filter_cnt + 1 + opt.accept_max;
+	host_addr = NULL;
 
-	if ( opt.tcp_event ){
-		struct addrinfo *host_addr, addr_hint;
-		int opt_val;
+	memset (&addr_hint, 0, sizeof (struct addrinfo));
 
-		// Increase poll size to accommodate socket descriptors for clients.
-		poll_len += opt.accept_max;
-		host_addr = NULL;
+	// Setup addrinfo hints
+	addr_hint.ai_family = opt.ip_version;
+	addr_hint.ai_socktype = SOCK_STREAM;
+	addr_hint.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
 
-		memset (&addr_hint, 0, sizeof (struct addrinfo));
+	rval = getaddrinfo (opt.hostname, opt.port, &addr_hint, &host_addr);
 
-		// Setup addrinfo hints
-		addr_hint.ai_family = opt.ip_version;
-		addr_hint.ai_socktype = SOCK_STREAM;
-		addr_hint.ai_flags = AI_PASSIVE | AI_NUMERICSERV | AI_ADDRCONFIG;
-
-		rval = getaddrinfo (opt.hostname, opt.port, &addr_hint, &host_addr);
-
-		if ( rval != 0 ){
-			fprintf (stderr, "%s: hostname resolve failed: %s\n", argv[0], gai_strerror (rval));
-			exitno = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		sock = socket (host_addr->ai_family, host_addr->ai_socktype | SOCK_NONBLOCK, host_addr->ai_protocol);
-
-		if ( sock == -1 ){
-			freeaddrinfo (host_addr);
-			fprintf (stderr, "%s: cannot create socket: %s\n", argv[0], strerror (errno));
-			exitno = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		opt_val = 1;
-
-		if ( setsockopt (sock, SOL_SOCKET, SO_REUSEADDR, &opt_val, sizeof (opt_val)) == -1 ){
-			freeaddrinfo (host_addr);
-			fprintf (stderr, "%s: cannot set socket options: %s\n", argv[0], strerror (errno));
-			exitno = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		rval = bind (sock, (struct sockaddr*) host_addr->ai_addr, host_addr->ai_addrlen);
-
-		if ( rval == -1 ){
-			freeaddrinfo (host_addr);
-			fprintf (stderr, "%s: cannot bind to address: %s\n", argv[0], strerror (errno));
-			exitno = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		rval = listen (sock, LISTEN_QUEUE_LEN);
-
-		if ( rval == -1 ){
-			freeaddrinfo (host_addr);
-			fprintf (stderr, "%s: %s\n", argv[0], strerror (errno));
-			exitno = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		freeaddrinfo (host_addr);
+	if ( rval != 0 ){
+		fprintf (stderr, "%s: hostname resolve failed: %s\n", argv[0], gai_strerror (rval));
+		exitno = EXIT_FAILURE;
+		goto cleanup;
 	}
+
+	sock = socket (host_addr->ai_family, host_addr->ai_socktype | SOCK_NONBLOCK, host_addr->ai_protocol);
+
+	if ( sock == -1 ){
+		freeaddrinfo (host_addr);
+		fprintf (stderr, "%s: cannot create socket: %s\n", argv[0], strerror (errno));
+		exitno = EXIT_FAILURE;
+		goto cleanup;
+	}
+
+	opt_val = 1;
+
+	if ( setsockopt (sock, SOL_SOCKET, SO_REUSEADDR, &opt_val, sizeof (opt_val)) == -1 ){
+		freeaddrinfo (host_addr);
+		fprintf (stderr, "%s: cannot set socket options: %s\n", argv[0], strerror (errno));
+		exitno = EXIT_FAILURE;
+		goto cleanup;
+	}
+
+	rval = bind (sock, (struct sockaddr*) host_addr->ai_addr, host_addr->ai_addrlen);
+
+	if ( rval == -1 ){
+		freeaddrinfo (host_addr);
+		fprintf (stderr, "%s: cannot bind to address: %s\n", argv[0], strerror (errno));
+		exitno = EXIT_FAILURE;
+		goto cleanup;
+	}
+
+	rval = listen (sock, LISTEN_QUEUE_LEN);
+
+	if ( rval == -1 ){
+		freeaddrinfo (host_addr);
+		fprintf (stderr, "%s: %s\n", argv[0], strerror (errno));
+		exitno = EXIT_FAILURE;
+		goto cleanup;
+	}
+
+	freeaddrinfo (host_addr);
 
 	pcap_session = (struct session_data*) calloc (filter_cnt, sizeof (struct session_data));
 
@@ -313,7 +309,7 @@ main (int argc, char *argv[])
 			goto cleanup;
 		}
 
-		pcap_session[i].handle = pcap_create (filter_iter->interface, pcap_errbuff);
+		pcap_session[i].handle = pcap_create (filter_iter->iface, pcap_errbuff);
 
 		if ( pcap_session[i].handle == NULL ){
 			fprintf (stderr, "%s: cannot start packet capture: %s\n", argv[0], pcap_errbuff);
@@ -324,7 +320,7 @@ main (int argc, char *argv[])
 		rval = pcap_set_rfmon (pcap_session[i].handle, filter_iter->rfmon);
 
 		if ( rval != 0 ){
-			fprintf (stderr, "%s: cannot enable monitor mode on interface '%s': %s\n", argv[0], filter_iter->interface, pcap_geterr (pcap_session[i].handle));
+			fprintf (stderr, "%s: cannot enable monitor mode on interface '%s': %s\n", argv[0], filter_iter->iface, pcap_geterr (pcap_session[i].handle));
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -332,7 +328,7 @@ main (int argc, char *argv[])
 		rval = pcap_set_promisc (pcap_session[i].handle, !(filter_iter->rfmon));
 
 		if ( rval != 0 ){
-			fprintf (stderr, "%s: cannot enable promiscuous mode on interface '%s'\n", argv[0], filter_iter->interface);
+			fprintf (stderr, "%s: cannot enable promiscuous mode on interface '%s'\n", argv[0], filter_iter->iface);
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -340,7 +336,7 @@ main (int argc, char *argv[])
 		rval = pcap_set_timeout (pcap_session[i].handle, SELECT_TIMEOUT_MS);
 
 		if ( rval != 0 ){
-			fprintf (stderr, "%s: cannot set read timeout on interface '%s': %s\n", argv[0], filter_iter->interface, pcap_geterr (pcap_session[i].handle));
+			fprintf (stderr, "%s: cannot set read timeout on interface '%s': %s\n", argv[0], filter_iter->iface, pcap_geterr (pcap_session[i].handle));
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -356,7 +352,7 @@ main (int argc, char *argv[])
 		rval = pcap_activate (pcap_session[i].handle);
 
 		if ( rval != 0 ){
-			fprintf (stderr, "%s: cannot activate packet capture on interface '%s': %s\n", argv[0], filter_iter->interface, pcap_geterr (pcap_session[i].handle));
+			fprintf (stderr, "%s: cannot activate packet capture on interface '%s': %s\n", argv[0], filter_iter->iface, pcap_geterr (pcap_session[i].handle));
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -366,7 +362,7 @@ main (int argc, char *argv[])
 			link_type = pcap_datalink_name_to_val (filter_iter->link_type);
 
 			if ( link_type == -1 ){
-				fprintf (stderr, "%s: cannot convert link-layer type '%s': unknown link-layer type name\n", argv[0], filter_iter->link_type);
+				fprintf (stderr, "%s: cannot convert link-layer type '%s': unknown identificator\n", argv[0], filter_iter->link_type);
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
@@ -406,7 +402,7 @@ main (int argc, char *argv[])
 			rval = pcap_setfilter (pcap_session[i].handle, &bpf_prog);
 
 			if ( rval == -1 ){
-				fprintf (stderr, "%s: cannot apply the filter '%s' on interface '%s': %s\n", argv[0], filter_iter->name, filter_iter->interface, pcap_geterr (pcap_session[i].handle));
+				fprintf (stderr, "%s: cannot apply the filter '%s' on interface '%s': %s\n", argv[0], filter_iter->name, filter_iter->iface, pcap_geterr (pcap_session[i].handle));
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
@@ -417,7 +413,7 @@ main (int argc, char *argv[])
 		pcap_session[i].fd = pcap_get_selectable_fd (pcap_session[i].handle);
 
 		if ( pcap_session[i].fd == -1 ){
-			fprintf (stderr, "%s: cannot obtain file descriptor for packet capture interface '%s'\n", argv[0], filter_iter->interface);
+			fprintf (stderr, "%s: cannot obtain file descriptor for packet capture interface '%s'\n", argv[0], filter_iter->iface);
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -506,7 +502,7 @@ main (int argc, char *argv[])
 
 	openlog ("kenotaphd", syslog_flags, LOG_DAEMON);
 
-	syslog (LOG_INFO, "daemon started (loaded filters: %u)", filter_cnt);
+	syslog (LOG_INFO, "kenotaph-daemon started (loaded filters: %u)", filter_cnt);
 
 	if ( opt.tcp_event )
 		syslog (LOG_INFO, "Event notifications available via %s:%s (ACCEPT_MAX: %u)", opt.hostname, opt.port, opt.accept_max);
@@ -647,20 +643,21 @@ main (int argc, char *argv[])
 			if ( opt.verbose )
 				syslog (LOG_INFO, "%s:%s", pcap_session[i].filter_name, evt_str);
 
-			// Send socket notification
+			// Store a notification message in buffer
 			snprintf (msg, sizeof (msg), "%s:%s", pcap_session[i].filter_name, evt_str);
 
-			for ( j = (filter_cnt + 1); j < poll_len; j++ ){
-				if ( poll_fd[j].fd == -1 )
+			// Send notification messsages here...
+			for ( i = (filter_cnt + 1); i < poll_len; i++ ){
+				if ( poll_fd[i].fd == -1 )
 					continue;
 
 				errno = 0;
-				rval = send (poll_fd[j].fd, msg, strlen (msg) + 1, MSG_NOSIGNAL | MSG_DONTWAIT);
+				rval = send (poll_fd[i].fd, msg, strlen (msg) + 1, MSG_NOSIGNAL | MSG_DONTWAIT);
 
 				if ( rval == -1 && (errno != EAGAIN && errno != EWOULDBLOCK) ){
 					syslog (LOG_WARNING, "failed to send notification: %s", strerror (errno));
-					close (poll_fd[j].fd);
-					poll_fd[j].fd = -1;
+					close (poll_fd[i].fd);
+					poll_fd[i].fd = -1;
 				}
 			}
 		}
@@ -672,7 +669,7 @@ main (int argc, char *argv[])
 #endif
 	}
 
-	syslog (LOG_INFO, "daemon shutdown (signal %u)", exitno);
+	syslog (LOG_INFO, "kenotaph-daemon shutdown (signal %u)", exitno);
 
 cleanup:
 	closelog ();
