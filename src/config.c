@@ -6,7 +6,6 @@
 #include <ctype.h>
 #include <libconfig.h>
 
-#include "session_event.h"
 #include "config.h"
 
 static int
