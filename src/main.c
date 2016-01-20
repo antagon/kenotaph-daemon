@@ -107,6 +107,7 @@ main (int argc, char *argv[])
 	sock = -1;
 	poll_fd = NULL;
 	pcap_session = NULL;
+	host_addr = NULL;
 	exitno = EXIT_SUCCESS;
 	syslog_flags = LOG_PID | LOG_PERROR;
 #ifdef DBG_AVG_LOOP_SPEED
@@ -227,11 +228,6 @@ main (int argc, char *argv[])
 
 	// No longer needed, free the resources
 	path_free (&path_config);
-
-	// Define a poll array length, the length includes space for all pcap fd +
-	// listening socket + accept_max number of client sockets.
-	poll_len = filter_cnt + 1 + opt.accept_max;
-	host_addr = NULL;
 
 	memset (&addr_hint, 0, sizeof (struct addrinfo));
 
@@ -423,6 +419,10 @@ main (int argc, char *argv[])
 	// were moved into session_data structure.
 	config_unload (&kenotaphd_conf);
 
+	// Define a poll array length, the length includes space for all pcap fd +
+	// listening socket + accept_max number of client sockets.
+	poll_len = filter_cnt + 1 + opt.accept_max;
+
 	poll_fd = (struct pollfd*) malloc (sizeof (struct pollfd) * poll_len);
 
 	if ( poll_fd == NULL ){
@@ -458,12 +458,6 @@ main (int argc, char *argv[])
 	rval &= sigaction (SIGINT, &sa, NULL);
 	rval &= sigaction (SIGQUIT, &sa, NULL);
 	rval &= sigaction (SIGTERM, &sa, NULL);
-
-	sa.sa_handler = SIG_IGN;
-	sigemptyset (&(sa.sa_mask));
-	sa.sa_flags = 0;
-
-	rval &= sigaction (SIGCHLD, &sa, NULL);
 
 	if ( rval != 0 ){
 		fprintf (stderr, "%s: cannot setup signal handler: %s\n", argv[0], strerror (errno));
