@@ -2,8 +2,10 @@
  * Copyright (c) 2016, CodeWard.org
  */
 #include <stdlib.h>
+#include <errno.h>
 #include <string.h>
-#include <ctype.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <libconfig.h>
 
 #include "config.h"
@@ -116,10 +118,23 @@ config_load (struct config *conf, const char *filename, char *errbuf)
 	config_setting_t *root_setting;
 	config_setting_t *filter_setting;
 	struct config_filter *filter;
+	struct stat fstat;
 	const char *str_val;
 	int i, filter_cnt, num;
 
 	config_init (&libconfig);
+
+	if ( stat (filename, &fstat) == -1 ){
+		snprintf (errbuf, CONF_ERRBUF_SIZE, "%s", strerror (errno));
+		config_destroy (&libconfig);
+		return -1;
+	}
+
+	if ( ! S_ISREG (fstat.st_mode) ){
+		snprintf (errbuf, CONF_ERRBUF_SIZE, "not a regular file");
+		config_destroy (&libconfig);
+		return -1;
+	}
 
 	if ( config_read_file (&libconfig, filename) == CONFIG_FALSE ){
 		snprintf (errbuf, CONF_ERRBUF_SIZE, "%s on line %d", config_error_text (&libconfig), config_error_line (&libconfig));
