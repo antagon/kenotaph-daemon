@@ -189,7 +189,6 @@ main (int argc, char *argv[])
 
 	if ( opt.tcp_event == 0 ){
 		fprintf (stderr, "%s: daemon not binded to any hostname and port. Use '--help' to see usage information.\n", argv[0]);
-		kenotaphd_help (argv[0]);
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
