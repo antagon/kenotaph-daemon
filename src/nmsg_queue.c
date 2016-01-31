@@ -8,7 +8,7 @@
 #include "nmsg_queue.h"
 
 struct nmsg_node*
-nmsg_node_new (const char *id, const char *event)
+nmsg_node_new (const char *id, const char *type)
 {
 	struct nmsg_node *node;
 
@@ -17,9 +17,16 @@ nmsg_node_new (const char *id, const char *event)
 	if ( node == NULL )
 		return NULL;
 
-	memset (node, 0, sizeof (struct nmsg_node));
+	// Length: id + semicolon + type + newline
+	node->len = strlen (id) + 1 + strlen (type) + 1;
 
-	snprintf (node->msg, sizeof (node->msg), "%s:%s%c", id, event, '\n');
+	strncpy (node->id, id, NMSG_ID_MAXLEN);
+	node->id[NMSG_ID_MAXLEN] = '\0';
+
+	strncpy (node->type, type, NMSG_TYPE_MAXLEN);
+	node->type[NMSG_TYPE_MAXLEN] = '\0';
+
+	node->next = NULL;
 
 	return node;
 }
@@ -28,12 +35,6 @@ int
 nmsg_node_extract (const struct nmsg_node *node, char *id, char *event)
 {
 	return 0;
-}
-
-void
-nmsg_queue_init (struct nmsg_queue *res)
-{
-	memset (res, 0, sizeof (struct nmsg_queue));
 }
 
 void
@@ -47,31 +48,30 @@ nmsg_queue_push (struct nmsg_queue *res, struct nmsg_node *node)
 		res->tail = node;
 	}
 
-	res->len += strlen (node->msg);
+	res->len += node->len;
 }
 
-char*
-nmsg_queue_serialize (struct nmsg_queue *res)
+ssize_t
+nmsg_queue_serialize (struct nmsg_queue *res, char **buff)
 {
 	struct nmsg_node *node;
-	char *buff;
 	size_t bcp;
 
-	buff = (char*) malloc (res->len + 1);
+	if ( res->len < 1 )
+		return 0;
 
-	if ( buff == NULL )
-		return NULL;
+	*buff = (char*) malloc (res->len + 1);
+
+	if ( *buff == NULL )
+		return -1;
 
 	bcp = 0;
 
 	for ( node = res->head; node != NULL; node = node->next ){
-		strncpy ((char*) (buff + bcp), node->msg, res->len - bcp);
-		bcp += strlen (node->msg);
+		bcp += snprintf ((char*) (*buff + bcp), res->len - bcp, "%s:%s%c", node->id, node->type, '\n');
 	}
 
-	buff[res->len] = '\0';
-
-	return buff;
+	return bcp;
 }
 
 void

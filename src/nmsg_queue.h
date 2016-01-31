@@ -4,11 +4,14 @@
 #ifndef _NMSG_QUEUE_H
 #define _NMSG_QUEUE_H
 
-#define NMSG_MAXLEN 255
+#define NMSG_ID_MAXLEN 127
+#define NMSG_TYPE_MAXLEN 8
 
 struct nmsg_node
 {
-	char msg[NMSG_MAXLEN + 1];
+	size_t len;
+	char id[NMSG_ID_MAXLEN + 1];
+	char type[NMSG_TYPE_MAXLEN + 1];
 	struct nmsg_node *next;
 };
 
@@ -21,14 +24,12 @@ struct nmsg_queue
 
 extern struct nmsg_node* nmsg_node_new (const char *id, const char *event);
 
-extern int nmsg_node_extract (const struct nmsg_node *node, char *id, char *event);
+extern int nmsg_node_extract (const struct nmsg_node *node, char *id, char *type);
 
-
-extern void nmsg_queue_init (struct nmsg_queue *res);
 
 extern void nmsg_queue_push (struct nmsg_queue *res, struct nmsg_node *node);
 
-extern char* nmsg_queue_serialize (struct nmsg_queue *res);
+extern ssize_t nmsg_queue_serialize (struct nmsg_queue *res, char **buff);
 
 extern void nmsg_queue_free (struct nmsg_queue *res);
 
