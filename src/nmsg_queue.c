@@ -31,12 +31,6 @@ nmsg_node_new (const char *id, const char *type)
 	return node;
 }
 
-int
-nmsg_node_extract (const struct nmsg_node *node, char *id, char *event)
-{
-	return 0;
-}
-
 void
 nmsg_queue_push (struct nmsg_queue *res, struct nmsg_node *node)
 {

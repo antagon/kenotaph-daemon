@@ -24,9 +24,6 @@ struct nmsg_queue
 
 extern struct nmsg_node* nmsg_node_new (const char *id, const char *event);
 
-extern int nmsg_node_extract (const struct nmsg_node *node, char *id, char *type);
-
-
 extern void nmsg_queue_push (struct nmsg_queue *res, struct nmsg_node *node);
 
 extern ssize_t nmsg_queue_serialize (struct nmsg_queue *res, char **buff);
