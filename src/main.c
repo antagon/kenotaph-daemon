@@ -23,6 +23,7 @@
 #include "config.h"
 #include "pathname.h"
 #include "session_data.h"
+#include "nmsg_queue.h"
 #include "hostport_parser.h"
 
 static const unsigned int SELECT_TIMEOUT_MS = 700;
@@ -80,6 +81,10 @@ main (int argc, char *argv[])
 	struct config kenotaphd_conf;
 	struct config_filter *filter_iter;
 	struct session_data *pcap_session;
+	char *nmsg_buff;
+	struct nmsg_node *nmsg_node;
+	struct nmsg_queue nmsg_que;
+	ssize_t nmsg_len;
 	struct option_data opt;
 	char conf_errbuff[CONF_ERRBUF_SIZE];
 	char pcap_errbuff[PCAP_ERRBUF_SIZE];
@@ -88,6 +93,9 @@ main (int argc, char *argv[])
 	clock_t clock_start;
 	double clock_avg;
 #endif
+	const u_char *pkt_data;
+	struct pcap_pkthdr *pkt_header;
+	time_t current_time;
 	struct sigaction sa;
 	struct addrinfo *host_addr, addr_hint;
 	struct option opt_long[] = {
@@ -114,13 +122,13 @@ main (int argc, char *argv[])
 	clock_avg = 0;
 #endif
 
+	memset (&nmsg_que, 0, sizeof (struct nmsg_queue));
+	memset (&path_config, 0, sizeof (struct pathname));
+	memset (&kenotaphd_conf, 0, sizeof (struct config));
 	memset (&opt, 0, sizeof (struct option_data));
 
 	opt.ip_version = AF_UNSPEC;
 	opt.accept_max = ACCEPT_MAX;
-
-	memset (&path_config, 0, sizeof (struct pathname));
-	memset (&kenotaphd_conf, 0, sizeof (struct config));
 
 	while ( (c = getopt_long (argc, argv, "46t:dm:Vhv", opt_long, &opt_index)) != -1 ){
 		switch ( c ){
@@ -506,10 +514,6 @@ main (int argc, char *argv[])
 	main_loop = 1;
 
 	while ( main_loop ){
-		const u_char *pkt_data;
-		struct pcap_pkthdr *pkt_header;
-		time_t current_time;
-
 		errno = 0;
 		rval = poll (poll_fd, poll_len, SELECT_TIMEOUT_MS);
 
@@ -579,7 +583,6 @@ main (int argc, char *argv[])
 
 		// Handle changes on pcap file descriptors
 		for ( i = 0; i < filter_cnt; i++ ){
-			char msg[CONF_FILTER_NAME_MAXLEN + 5];
 			const char *evt_str;
 
 			// Handle incoming packet
@@ -636,8 +639,27 @@ main (int argc, char *argv[])
 			if ( opt.verbose )
 				syslog (LOG_INFO, "%s:%s", pcap_session[i].filter_name, evt_str);
 
-			// Store a notification message in buffer
-			snprintf (msg, sizeof (msg), "%s:%s", pcap_session[i].filter_name, evt_str);
+			nmsg_node = nmsg_node_new (pcap_session[i].filter_name, evt_str);
+
+			if ( nmsg_node == NULL ){
+				fprintf (stderr, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
+				exitno = EXIT_FAILURE;
+				goto cleanup;
+			}
+
+			nmsg_queue_push (&nmsg_que, nmsg_node);
+		}
+
+		nmsg_len = nmsg_queue_serialize (&nmsg_que, &nmsg_buff);
+
+		if ( nmsg_len == -1 ){
+			fprintf (stderr, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
+			exitno = EXIT_FAILURE;
+			goto cleanup;
+		}
+
+		if ( nmsg_len > 0 ){
+			nmsg_queue_free (&nmsg_que);
 
 			// Send notification messsages here...
 			for ( i = (filter_cnt + 1); i < poll_len; i++ ){
@@ -645,7 +667,7 @@ main (int argc, char *argv[])
 					continue;
 
 				errno = 0;
-				rval = send (poll_fd[i].fd, msg, strlen (msg) + 1, MSG_NOSIGNAL | MSG_DONTWAIT);
+				rval = send (poll_fd[i].fd, nmsg_buff, (size_t) nmsg_len, MSG_NOSIGNAL | MSG_DONTWAIT);
 
 				if ( rval == -1 && (errno != EAGAIN && errno != EWOULDBLOCK) ){
 					syslog (LOG_WARNING, "failed to send notification: %s", strerror (errno));
@@ -653,6 +675,8 @@ main (int argc, char *argv[])
 					poll_fd[i].fd = -1;
 				}
 			}
+
+			free (nmsg_buff);
 		}
 
 #ifdef DBG_AVG_LOOP_SPEED
@@ -672,6 +696,8 @@ cleanup:
 			session_data_free (&(pcap_session[i]));
 		free (pcap_session);
 	}
+
+	nmsg_queue_free (&nmsg_que);
 
 	if ( poll_fd != NULL )
 		free (poll_fd);

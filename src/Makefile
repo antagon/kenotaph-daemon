@@ -21,7 +21,7 @@ uninstall:
 clean:
 	rm -f *.o $(NAME)
 
-$(NAME): main.o config.o session_data.o pathname.o hostport_parser.o
+$(NAME): main.o config.o session_data.o pathname.o hostport_parser.o nmsg_queue.o
 	$(CC) $(CFLAGS) $^ -o $(NAME) -lpcap -lconfig
 
 main.o: main.c
@@ -37,5 +37,8 @@ pathname.o: pathname.c pathname.h
 	$(CC) $(CFLAGS) -c $<
 
 hostport_parser.o: hostport_parser.c hostport_parser.h
+	$(CC) $(CFLAGS) -c $<
+
+nmsg_queue.o: nmsg_queue.c nmsg_queue.h
 	$(CC) $(CFLAGS) -c $<
 
