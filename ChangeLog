@@ -1,0 +1,15 @@
+version 1.0.0
+-------------
+
+* Initial version release. Source is based on etherpoke v2.5.0, though many
+parts related to execution of event hooks were removed, and other parts were
+tuned-up for performance. Format of a configuration remains the same,
+including the option names, though their number was substantially lowered.
+
+* Make '-t, --hostname' mandatory, as there is no other purpose but to send
+notifications via TCP/IP.
+
+* Send notifications to a single client in bulk.
+
+=> Allow config reload by sending the SIGHUP signal to a running process.
+
