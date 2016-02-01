@@ -82,6 +82,7 @@ main (int argc, char *argv[])
 	struct config_filter *filter_iter;
 	struct session_data *pcap_session;
 	char *nmsg_buff;
+	struct nmsg_text nmsg_text;
 	struct nmsg_node *nmsg_node;
 	struct nmsg_queue nmsg_que;
 	ssize_t nmsg_len;
@@ -639,7 +640,13 @@ main (int argc, char *argv[])
 			if ( opt.verbose )
 				syslog (LOG_INFO, "%s:%s", pcap_session[i].filter_name, evt_str);
 
-			nmsg_node = nmsg_node_new (pcap_session[i].filter_name, evt_str);
+			strncpy (nmsg_text.id, pcap_session[i].filter_name, NMSG_ID_MAXLEN);
+			nmsg_text.id[NMSG_ID_MAXLEN] = '\0';
+
+			strncpy (nmsg_text.type, evt_str, NMSG_TYPE_MAXLEN);
+			nmsg_text.type[NMSG_TYPE_MAXLEN] = '\0';
+
+			nmsg_node = nmsg_node_new (&nmsg_text);
 
 			if ( nmsg_node == NULL ){
 				fprintf (stderr, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
