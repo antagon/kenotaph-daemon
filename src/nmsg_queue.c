@@ -19,7 +19,7 @@ nmsg_node_new (const struct nmsg_text *msg_text)
 
 	memset (node, 0, sizeof (struct nmsg_node));
 
-	snprintf (node->msg, sizeof (node->msg), "%s:%s\n", msg_text->id, msg_text->type);
+	snprintf (node->msg, sizeof (node->msg), "%s%c%s%c", msg_text->id, NMSG_FLDDELIM, msg_text->type, NMSG_MSGDELIM);
 
 	node->len = strlen (msg_text->id) + 1 + strlen (msg_text->type) + 1;
 
@@ -36,19 +36,20 @@ nmsg_node_text (const struct nmsg_node *node, struct nmsg_text *msg_text)
 	len = 0;
 	maxlen = NMSG_ID_MAXLEN;
 	node_buff = msg_text->id;
+
 	state = NMSG_ECON;
 
 	memset (msg_text, 0, sizeof (struct nmsg_text));
 
 	for ( i = 0; i < node->len; i++ ){
 
-		if ( node->msg[i] == ':' ){
+		if ( node->msg[i] == NMSG_FLDDELIM ){
 			len = 0;
 			maxlen = NMSG_TYPE_MAXLEN;
 			node_buff = msg_text->type;
 			continue;
-		} else if ( node->msg[i] == '\n' ){
-			state = NMSG_OK;
+		} else if ( node->msg[i] == NMSG_MSGDELIM ){
+			state = NMSG_EOK;
 			break;
 		}
 
@@ -103,31 +104,35 @@ nmsg_queue_serialize (struct nmsg_queue *res, char **buff)
 ssize_t
 nmsg_queue_unserialize (struct nmsg_queue *res, const char *buff, size_t buff_len)
 {
-	static struct nmsg_node *node = NULL;
+	struct nmsg_node **node;
 	size_t i;
 
-	//node = NULL;
+	node = &(res->st_node);
 
 	for ( i = 0; i < buff_len; i++ ){
 
-		if ( node == NULL ){
-			node = (struct nmsg_node*) malloc (sizeof (struct nmsg_node));
+		if ( *node == NULL ){
+			*node = (struct nmsg_node*) malloc (sizeof (struct nmsg_node));
 
-			if ( node == NULL )
+			if ( *node == NULL )
 				return -1;
 
-			memset (node, 0, sizeof (struct nmsg_node));
+			memset (*node, 0, sizeof (struct nmsg_node));
 
-			nmsg_queue_push (res, node);
+			nmsg_queue_push (res, *node);
 		}
 
-		if ( node->len > NMSG_MAXLEN )
-			continue;
+		// Check if we have reached end of nmsg message buffer, if so,
+		// terminate the message with newline character and exit.
+		if ( (*node)->len == NMSG_MAXLEN ){
+			(*node)->msg[(*node)->len - 1] = NMSG_MSGDELIM;
+			break;
+		}
 
-		node->msg[node->len++] = buff[i];
+		(*node)->msg[(*node)->len++] = buff[i];
 
-		if ( buff[i] == '\n' ){
-			node = NULL;
+		if ( buff[i] == NMSG_MSGDELIM ){
+			*node = NULL;
 			continue;
 		}
 	}
@@ -136,14 +141,14 @@ nmsg_queue_unserialize (struct nmsg_queue *res, const char *buff, size_t buff_le
 }
 
 void
-nmsg_queue_delete (struct nmsg_queue *res, struct nmsg_node *node)
+nmsg_queue_delete (struct nmsg_queue *res, struct nmsg_node **node)
 {
 	struct nmsg_node *prev_node, *next_node;
 
-	prev_node = node->prev;
-	next_node = node->next;
+	prev_node = (*node)->prev;
+	next_node = (*node)->next;
 
-	free (node);
+	free (*node);
 
 	if ( prev_node == NULL )
 		res->head = next_node;
@@ -155,7 +160,10 @@ nmsg_queue_delete (struct nmsg_queue *res, struct nmsg_node *node)
 	else
 		next_node->prev = prev_node;
 
-	return;
+	if ( *node == res->st_node )
+		res->st_node = NULL;
+
+	*node = next_node;
 }
 
 void
