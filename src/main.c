@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <arpa/inet.h>
 #include <getopt.h>
 #include <syslog.h>
 #include <unistd.h>
@@ -533,9 +534,13 @@ main (int argc, char *argv[])
 
 		// Accept incoming connection
 		if ( poll_fd[filter_cnt].revents & POLLIN ){
+			struct sockaddr_in cli_addr;
+			socklen_t cli_addrlen;
 			int sock_new;
 
-			sock_new = accept (sock, NULL, NULL);
+			cli_addrlen = sizeof (cli_addr);
+
+			sock_new = accept (sock, (struct sockaddr*) &cli_addr, &cli_addrlen);
 
 			if ( sock_new == -1 ){
 				syslog (LOG_ERR, "cannot accept new connection: %s", strerror (errno));
@@ -557,8 +562,17 @@ main (int argc, char *argv[])
 					syslog (LOG_INFO, "Client refused: too many concurrent connections");
 				close (sock_new);
 			} else {
-				if ( opt.verbose )
-					syslog (LOG_INFO, "Client connected...");
+				if ( opt.verbose ){
+					char cliaddr_str[INET6_ADDRSTRLEN];
+
+					if ( inet_ntop (cli_addr.sin_family, &(cli_addr.sin_addr), cliaddr_str, sizeof (cliaddr_str)) == NULL ){
+						syslog (LOG_ERR, "cannot convert client address: %s", strerror (errno));
+						exitno = EXIT_FAILURE;
+						goto cleanup;
+					}
+
+					syslog (LOG_INFO, "Client %s:%hu connected...", cliaddr_str, ntohs (cli_addr.sin_port));
+				}
 			}
 		}
 
