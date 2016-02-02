@@ -720,8 +720,18 @@ cleanup:
 
 	nmsg_queue_free (&nmsg_que);
 
-	if ( poll_fd != NULL )
+	if ( poll_fd != NULL ){
+
+		for ( i = (filter_cnt + 1); i < poll_len; i++ ){
+
+			if ( poll_fd[i].fd == -1 )
+				continue;
+
+			close (poll_fd[i].fd);
+		}
+
 		free (poll_fd);
+	}
 
 	if ( sock != -1 )
 		close (sock);
