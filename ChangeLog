@@ -9,5 +9,9 @@ including the option names, though their number was substantially lowered.
 * Make '-t, --hostname' mandatory, as there is no other purpose but to send
 notifications via TCP/IP.
 
+* New configuration option 'promisc_mode' which allows to set/unset
+promiscuous mode of a NIC card. This option was not present in the original
+source code. By default, promiscuous mode is enabled.
+
 * Send notifications to a single client in burst mode.
 
