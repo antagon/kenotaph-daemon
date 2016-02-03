@@ -9,7 +9,5 @@ including the option names, though their number was substantially lowered.
 * Make '-t, --hostname' mandatory, as there is no other purpose but to send
 notifications via TCP/IP.
 
-* Send notifications to a single client in bulk.
-
-=> Allow config reload by sending the SIGHUP signal to a running process.
+* Send notifications to a single client in burst mode.
 
