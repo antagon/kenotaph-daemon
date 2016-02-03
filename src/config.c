@@ -67,19 +67,19 @@ filter_set_interface (struct config_filter *filter, const char *interface)
 	return 0;
 }
 
-static void
+static inline void
 filter_set_session_timeout (struct config_filter *filter, uint32_t session_timeout)
 {
 	filter->session_timeout = session_timeout;
 }
 
-static void
+static inline void
 filter_set_monitor_mode (struct config_filter *filter, uint8_t monitor_mode)
 {
 	filter->rfmon = monitor_mode;
 }
 
-static void
+static inline void
 filter_set_promisc_mode (struct config_filter *filter, uint8_t promisc_mode)
 {
 	filter->promisc = promisc_mode;
