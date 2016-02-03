@@ -20,6 +20,7 @@ struct config_filter
 	char *link_type;
 	uint32_t session_timeout;
 	uint8_t rfmon;
+	uint8_t promisc;
 	struct config_filter *next;
 };
 

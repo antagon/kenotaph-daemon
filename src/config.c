@@ -79,6 +79,12 @@ filter_set_monitor_mode (struct config_filter *filter, uint8_t monitor_mode)
 	filter->rfmon = monitor_mode;
 }
 
+static void
+filter_set_promisc_mode (struct config_filter *filter, uint8_t promisc_mode)
+{
+	filter->promisc = promisc_mode;
+}
+
 static int
 filter_set_link_type (struct config_filter *filter, const char *link_type)
 {
@@ -220,6 +226,12 @@ config_load (struct config *conf, const char *filename, char *errbuf)
 		}
 
 		filter_set_monitor_mode (filter, num);
+
+		if ( config_setting_lookup_bool (filter_setting, "promisc_mode", &num) == CONFIG_FALSE ){
+			num = 1;
+		}
+
+		filter_set_promisc_mode (filter, num);
 
 		if ( config_setting_lookup_string (filter_setting, "interface", &str_val) == CONFIG_FALSE ){
 			snprintf (errbuf, CONF_ERRBUF_SIZE, "in filter '%s', missing option 'interface'", filter->name);

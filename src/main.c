@@ -330,7 +330,7 @@ main (int argc, char *argv[])
 			goto cleanup;
 		}
 
-		rval = pcap_set_promisc (pcap_session[i].handle, !(filter_iter->rfmon));
+		rval = pcap_set_promisc (pcap_session[i].handle, filter_iter->promisc);
 
 		if ( rval != 0 ){
 			fprintf (stderr, "%s: cannot enable promiscuous mode on interface '%s'\n", argv[0], filter_iter->iface);
@@ -721,15 +721,12 @@ cleanup:
 	nmsg_queue_free (&nmsg_que);
 
 	if ( poll_fd != NULL ){
-
 		for ( i = (filter_cnt + 1); i < poll_len; i++ ){
-
 			if ( poll_fd[i].fd == -1 )
 				continue;
 
 			close (poll_fd[i].fd);
 		}
-
 		free (poll_fd);
 	}
 
