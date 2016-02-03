@@ -130,8 +130,8 @@ config_load (struct config *conf, const char *filename, char *errbuf)
 		return -1;
 	}
 
-	if ( ! S_ISREG (fstat.st_mode) ){
-		snprintf (errbuf, CONF_ERRBUF_SIZE, "not a regular file");
+	if ( S_ISDIR (fstat.st_mode) ){
+		snprintf (errbuf, CONF_ERRBUF_SIZE, "is a directory");
 		config_destroy (&libconfig);
 		return -1;
 	}
