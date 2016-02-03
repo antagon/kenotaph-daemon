@@ -8,7 +8,7 @@
 #include <limits.h>
 #include <errno.h>
 #include <time.h>
-#include <pcap.h>
+#include <pcap/pcap.h>
 #include <poll.h>
 #include <netdb.h>
 #include <libconfig.h>
@@ -142,7 +142,7 @@ main (int argc, char *argv[])
 				rval = hostport_parse (optarg, opt.hostname, opt.port);
 
 				if ( rval == -1 || strlen (opt.hostname) == 0 || strlen (opt.port) == 0 ){
-					fprintf (stderr, "%s: invalid hostname format (expects HOSTNAME:PORT)\n", argv[0]);
+					fprintf (stderr, "%s: option '-t, --hostname' has invalid format (expects HOSTNAME:PORT)\n", argv[0]);
 					exitno = EXIT_FAILURE;
 					goto cleanup;
 				}
@@ -159,10 +159,16 @@ main (int argc, char *argv[])
 				break;
 
 			case 'm':
-				sscanf (optarg, "%u", &(opt.accept_max));
+				rval = sscanf (optarg, "%u", &(opt.accept_max));
+
+				if ( rval < 1 ){
+					fprintf (stderr, "%s: option '-m, --accept-max' has invalid format (expects a number)\n", argv[0]);
+					exitno = EXIT_FAILURE;
+					goto cleanup;
+				}
 
 				if ( opt.accept_max == 0 ){
-					fprintf (stderr, "%s: invalid number for maximum connections\n", argv[0]);
+					fprintf (stderr, "%s: option '-m, --accept-max' has invalid format (expects a number >0)\n", argv[0]);
 					exitno = EXIT_FAILURE;
 					goto cleanup;
 				}
