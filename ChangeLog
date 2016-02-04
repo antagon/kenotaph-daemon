@@ -3,8 +3,8 @@ version 1.0.0
 
 * Initial version release. Source is based on etherpoke v2.5.0, though many
 parts related to execution of event hooks were removed, and other parts were
-tuned-up for performance. Format of a configuration remains the same,
-including the option names, though their number was substantially lowered.
+tuned-up for performance. Format of a configuration has changed, number of
+options was substantially lowered, and some options were renamed.
 
 * Make '-t, --hostname' mandatory, as there is no other purpose but to send
 notifications via TCP/IP.
