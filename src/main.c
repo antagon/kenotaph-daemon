@@ -50,14 +50,14 @@ kenotaphd_help (const char *p)
 {
 	fprintf (stdout, "Usage: %s [OPTIONS] <FILE>\n\n"
 					 "Options:\n"
-					 "  -4                        bind to IPv4 address\n"
-					 "  -6                        bind to IPv6 address\n"
-					 "  -t, --hostname=HOST:PORT  bind to address/hostname and port\n"
-					 "  -d, --daemon              run as a daemon\n"
-					 "  -m, --accept-max=NUM      accept maximum of NUM concurrent client connections\n"
-					 "  -V, --verbose             increase verbosity\n"
-					 "  -h, --help                show this usage information\n"
-					 "  -v, --version             show version information\n"
+					 "  -4                            resolve hostname to IPv4 address\n"
+					 "  -6                            resolve hostname to IPv6 address\n"
+					 "  -t, --hostname=HOSTNAME:PORT  bind socket to hostname and port\n"
+					 "  -d, --daemon                  run as a daemon\n"
+					 "  -m, --accept-max=NUM          accept maximum of NUM concurrent client connections\n"
+					 "  -V, --verbose                 increase verbosity\n"
+					 "  -h, --help                    show usage information\n"
+					 "  -v, --version                 show version information\n"
 					 , p);
 }
 
