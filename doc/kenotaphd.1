@@ -1,0 +1,54 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.\"
+.TH KENOTAPHD 1 "February 2016" "kenotaphd-1.0.0" "User Manual"
+.SH NAME
+kenotaphd \- a device presence monitor
+.SH SYNOPSIS
+.B kenotaphd
+[OPTIONS]
+.B \-t
+.I HOSTNAME:PORT
+.I config-file
+.SH DESCRIPTION
+.B kenotaphd
+is a tool for detecting a presence of network devices through means of a packet capture. Both Wired and Wireless networks are supported, assuming appropriate hardware is available. Targetted device is identified by a user defined Berkeley Packet Filter, either by its IP address or Hardware address, however the use of BPF allows for higher complexity. A packet capture is done in promiscuous mode, or in monitor mode, for Wireless network interfaces.
+
+.B kenotaphd
+is designed to be a 'daemon' program that runs in the background. To communicate with other components, a TCP/IP socket is opened on a user defined port. When a device becomes present on a network, or becomes absent, a notification message is sent to all consumers connected to the socket.
+.SH OPTIONS
+.TP
+.B \-4
+resolve hostname to IPv4 address
+.TP
+.B \-6
+resolve hostname to IPv6 address
+.TP
+.BI "\-t, \-\-hostname="HOSTNAME:PORT
+bind socket to
+.I HOSTNAME
+and
+.I PORT
+.TP
+.B "\-d, \-\-daemon"
+run as a daemon
+.TP
+.BI "\-m, \-\-accept-max="NUM
+accept maximum of
+.I NUM
+concurrent client connections
+.TP
+.B "\-V, \-\-verbose"
+increase verbosity
+.TP
+.B "\-h, \-\-help"
+show usage information
+.TP
+.B "\-v, \-\-version"
+show version information
+.SH BUGS
+When capturing a Wireless traffic in monitor mode, only a traffic from the current channel is available. It is not possible to target a specific channel, or do channel hopping, unless it is done by other means.
+.SH AUTHOR
+Dan Antagon <antagon@codeward.org>
+.SH "SEE ALSO"
+.BR kenotaphsched (1)
