@@ -5,24 +5,24 @@
 CC = gcc
 CFLAGS = -std=gnu99 -O2 -pedantic -Wall -ggdb
 
-NAME = kenotaphd
+TARGET = kenotaphd
 INSTALL_DIR = /usr/local/sbin
 
 .PHONY: clean install
 
-all: $(NAME)
+all: $(TARGET)
 
-install: $(NAME)
-	install --mode 755 $(NAME) $(INSTALL_DIR)
+install:
+	install --mode 755 $(TARGET) $(INSTALL_DIR)
 
 uninstall:
-	rm -f $(INSTALL_DIR)/$(NAME)
+	rm -f $(INSTALL_DIR)/$(TARGET)
 
 clean:
-	rm -f *.o $(NAME)
+	rm -f *.o $(TARGET)
 
-$(NAME): main.o config.o session_data.o pathname.o hostport_parser.o nmsg_queue.o
-	$(CC) $(CFLAGS) $^ -o $(NAME) -lpcap -lconfig
+$(TARGET): main.o config.o session_data.o pathname.o hostport_parser.o nmsg_queue.o
+	$(CC) $(CFLAGS) $^ -o $(TARGET) -lpcap -lconfig
 
 main.o: main.c
 	$(CC) $(CFLAGS) -c $<
