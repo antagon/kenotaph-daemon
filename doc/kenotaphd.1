@@ -3,7 +3,7 @@
 .\"
 .TH KENOTAPHD 1 "February 2016" "kenotaphd-1.0.0" "User Manual"
 .SH NAME
-kenotaphd \- a device presence monitor
+kenotaphd \- a network device presence monitor
 .SH SYNOPSIS
 .B kenotaphd
 [OPTIONS]
@@ -12,10 +12,14 @@ kenotaphd \- a device presence monitor
 .I config-file
 .SH DESCRIPTION
 .B kenotaphd
-is a tool for detecting a presence of network devices through means of a packet capture. Both Wired and Wireless networks are supported, assuming appropriate hardware is available. Targetted device is identified by a user defined Berkeley Packet Filter, either by its IP address or Hardware address, however the use of BPF allows for higher complexity. A packet capture is done in promiscuous mode, or in monitor mode, for Wireless network interfaces.
+is a tool for detecting a presence of network devices through means of a packet capture. Both Wired and Wireless networks are supported, assuming appropriate hardware is available. Targetted device is identified by a user defined Berkeley Packet Filter, either by its IP address or Hardware address, however the use of BPF allows for higher complexity. A packet capture is done in promiscuous mode, or in monitor mode for Wireless network interfaces.
 
 .B kenotaphd
-is designed to be a 'daemon' program that runs in the background. To communicate with other components, a TCP/IP socket is opened on a user defined port. When a device becomes present on a network, or becomes absent, a notification message is sent to all consumers connected to the socket.
+is designed to be a 'daemon' program that runs in the background. To communicate with other components, a TCP/IP socket is opened on a defined
+.I PORT
+and binded to a
+.I HOSTNAME
+, which can be specified as an IP address or as a domain name, the latter gets resolved to either IPv4 address or IPv6 address. How the domain name gets resolved can be controlled with available options. When a targetted device becomes present on a network, or becomes absent, a notification message is sent to all consumers connected to the socket.
 .SH OPTIONS
 .TP
 .B \-4
@@ -47,7 +51,7 @@ show usage information
 .B "\-v, \-\-version"
 show version information
 .SH BUGS
-When capturing a Wireless traffic in monitor mode, only a traffic from the current channel is available. It is not possible to target a specific channel, or do channel hopping, unless it is done by other means.
+When capturing a Wireless traffic in monitor mode, only a traffic from the current channel is available. It is not possible to target a specific channel, or do a channel hopping, unless it is done by other means.
 .SH AUTHOR
 Dan Antagon <antagon@codeward.org>
 .SH "SEE ALSO"
