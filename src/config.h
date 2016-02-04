@@ -18,7 +18,7 @@ struct config_filter
 	char *iface;
 	char *match;
 	char *link_type;
-	uint32_t session_timeout;
+	uint32_t timeout;
 	uint8_t rfmon;
 	uint8_t promisc;
 	struct config_filter *next;

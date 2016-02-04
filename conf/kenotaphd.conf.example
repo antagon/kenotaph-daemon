@@ -4,5 +4,5 @@ test_filter: {
 	link_type = "EN10MB";
 	monitor_mode = false;
 	promisc_mode = true;
-	session_timeout = 10;
+	timeout = 10;
 }

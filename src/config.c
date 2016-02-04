@@ -68,9 +68,9 @@ filter_set_interface (struct config_filter *filter, const char *interface)
 }
 
 static inline void
-filter_set_session_timeout (struct config_filter *filter, uint32_t session_timeout)
+filter_set_timeout (struct config_filter *filter, uint32_t timeout)
 {
-	filter->session_timeout = session_timeout;
+	filter->timeout = timeout;
 }
 
 static inline void
@@ -203,8 +203,8 @@ config_load (struct config *conf, const char *filename, char *errbuf)
 
 		filter_set_matchrule (filter, str_val);
 
-		if ( config_setting_lookup_int (filter_setting, "session_timeout", &num) == CONFIG_FALSE ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "in filter '%s', missing option 'session_timeout'", filter->name);
+		if ( config_setting_lookup_int (filter_setting, "timeout", &num) == CONFIG_FALSE ){
+			snprintf (errbuf, CONF_ERRBUF_SIZE, "in filter '%s', missing option 'timeout'", filter->name);
 			free (filter);
 			config_unload (conf);
 			config_destroy (&libconfig);
@@ -212,14 +212,14 @@ config_load (struct config *conf, const char *filename, char *errbuf)
 		}
 
 		if ( num == 0 ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "in filter '%s', 'session_timeout' must be greater than 0", filter->name);
+			snprintf (errbuf, CONF_ERRBUF_SIZE, "in filter '%s', 'timeout' must be >0", filter->name);
 			free (filter);
 			config_unload (conf);
 			config_destroy (&libconfig);
 			return -1;
 		}
 	
-		filter_set_session_timeout (filter, ((num < 0)? (num * -1):num));
+		filter_set_timeout (filter, ((num < 0)? (num * -1):num));
 
 		if ( config_setting_lookup_bool (filter_setting, "monitor_mode", &num) == CONFIG_FALSE ){
 			num = 0;

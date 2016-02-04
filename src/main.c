@@ -310,7 +310,7 @@ main (int argc, char *argv[])
 
 		session_data_init (&(pcap_session[i]));
 
-		pcap_session[i].timeout = filter_iter->session_timeout;
+		pcap_session[i].timeout = filter_iter->timeout;
 
 		pcap_session[i].filter_name = strdup (filter_iter->name);
 
