@@ -48,7 +48,7 @@ static int exitno;
 static void
 kenotaphd_help (const char *p)
 {
-	fprintf (stdout, "Usage: %s [OPTIONS] <FILE>\n\n"
+	fprintf (stdout, "Usage: %s [OPTIONS] -t HOSTNAME:PORT <config-file>\n\n"
 					 "Options:\n"
 					 "  -4                            resolve hostname to IPv4 address\n"
 					 "  -6                            resolve hostname to IPv6 address\n"
