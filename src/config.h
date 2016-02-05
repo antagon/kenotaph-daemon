@@ -4,7 +4,6 @@
 #ifndef _CONFIG_H
 #define _CONFIG_H
 
-#include <stdlib.h>
 #include <stdint.h>
 
 #define CONF_FILTER_NAME_MAXLEN 128

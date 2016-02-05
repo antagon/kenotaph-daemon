@@ -4,6 +4,8 @@
 #ifndef _SESSION_EVENT_H
 #define _SESSION_EVENT_H
 
+#include <time.h>
+
 enum
 {
 	SE_NUL = 0x00,

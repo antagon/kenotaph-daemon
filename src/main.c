@@ -11,7 +11,6 @@
 #include <pcap/pcap.h>
 #include <poll.h>
 #include <netdb.h>
-#include <libconfig.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -263,7 +262,7 @@ main (int argc, char *argv[])
 
 	if ( sock == -1 ){
 		freeaddrinfo (host_addr);
-		fprintf (stderr, "%s: cannot create socket: %s\n", argv[0], strerror (errno));
+		fprintf (stderr, "%s: cannot create a socket: %s\n", argv[0], strerror (errno));
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -373,7 +372,7 @@ main (int argc, char *argv[])
 			link_type = pcap_datalink_name_to_val (filter_iter->link_type);
 
 			if ( link_type == -1 ){
-				fprintf (stderr, "%s: device rule '%s', cannot convert link-layer type '%s': unknown identificator\n", argv[0], filter_iter->name, filter_iter->link_type);
+				fprintf (stderr, "%s: device rule '%s', unknown link-layer type '%s'\n", argv[0], filter_iter->name, filter_iter->link_type);
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}

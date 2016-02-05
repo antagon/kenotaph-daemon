@@ -1,7 +1,6 @@
 /*
  * Copyright (c) 2016, CodeWard.org
  */
-#include <stdio.h>
 #include <string.h>
 #include <limits.h>
 
