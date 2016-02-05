@@ -20,6 +20,8 @@ is designed to be a 'daemon' program that runs in the background. To communicate
 and binded to a
 .I HOSTNAME
 , which can be specified as an IP address or as a domain name, the latter gets resolved to either IPv4 address or IPv6 address. How the domain name gets resolved can be controlled with available options. When a targetted device becomes present on a network, or becomes absent, a notification message is sent to all consumers connected to the socket.
+
+A notification message is an ASCII formatted string that consists of two fields separated by a semicolon (':'). The first field contains an ID, which corresponds to a name of a device definition found in a configuration file, and the second contains a name of the event. Whole message is terminated with a newline ('\\n') character.
 .SH OPTIONS
 .TP
 .B \-4
