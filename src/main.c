@@ -236,7 +236,7 @@ main (int argc, char *argv[])
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	} else if ( filter_cnt == 0 ){
-		fprintf (stderr, "%s: nothing to do, no filters defined.\n", argv[0]);
+		fprintf (stderr, "%s: no device rules were found, nothing to do...\n", argv[0]);
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -331,7 +331,7 @@ main (int argc, char *argv[])
 		rval = pcap_set_rfmon (pcap_session[i].handle, filter_iter->rfmon);
 
 		if ( rval != 0 ){
-			fprintf (stderr, "%s: cannot enable monitor mode on interface '%s': %s\n", argv[0], filter_iter->iface, pcap_geterr (pcap_session[i].handle));
+			fprintf (stderr, "%s: interface '%s', cannot enable monitor mode: %s\n", argv[0], filter_iter->iface, pcap_geterr (pcap_session[i].handle));
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -339,7 +339,7 @@ main (int argc, char *argv[])
 		rval = pcap_set_promisc (pcap_session[i].handle, filter_iter->promisc);
 
 		if ( rval != 0 ){
-			fprintf (stderr, "%s: cannot enable promiscuous mode on interface '%s'\n", argv[0], filter_iter->iface);
+			fprintf (stderr, "%s: interface '%s', cannot enable promiscuous mode: %s\n", argv[0], filter_iter->iface, pcap_geterr (pcap_session[i].handle));
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -347,7 +347,7 @@ main (int argc, char *argv[])
 		rval = pcap_set_timeout (pcap_session[i].handle, SELECT_TIMEOUT_MS);
 
 		if ( rval != 0 ){
-			fprintf (stderr, "%s: cannot set read timeout on interface '%s': %s\n", argv[0], filter_iter->iface, pcap_geterr (pcap_session[i].handle));
+			fprintf (stderr, "%s: interface '%s', cannot set read timeout: %s\n", argv[0], filter_iter->iface, pcap_geterr (pcap_session[i].handle));
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -355,7 +355,7 @@ main (int argc, char *argv[])
 		rval = pcap_setnonblock (pcap_session[i].handle, 1, pcap_errbuff);
 
 		if ( rval == -1 ){
-			fprintf (stderr, "%s: cannot set nonblock mode on packet capture resource: %s\n", argv[0], pcap_errbuff);
+			fprintf (stderr, "%s: interface '%s', cannot set pcap resource to nonblock: %s\n", argv[0], filter_iter->iface, pcap_errbuff);
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -363,7 +363,7 @@ main (int argc, char *argv[])
 		rval = pcap_activate (pcap_session[i].handle);
 
 		if ( rval != 0 ){
-			fprintf (stderr, "%s: cannot activate packet capture on interface '%s': %s\n", argv[0], filter_iter->iface, pcap_geterr (pcap_session[i].handle));
+			fprintf (stderr, "%s: interface '%s', cannot activate packet capture: %s\n", argv[0], filter_iter->iface, pcap_geterr (pcap_session[i].handle));
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -373,7 +373,7 @@ main (int argc, char *argv[])
 			link_type = pcap_datalink_name_to_val (filter_iter->link_type);
 
 			if ( link_type == -1 ){
-				fprintf (stderr, "%s: cannot convert link-layer type '%s': unknown identificator\n", argv[0], filter_iter->link_type);
+				fprintf (stderr, "%s: device rule '%s', cannot convert link-layer type '%s': unknown identificator\n", argv[0], filter_iter->name, filter_iter->link_type);
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
@@ -394,7 +394,7 @@ main (int argc, char *argv[])
 		rval = pcap_set_datalink (pcap_session[i].handle, link_type);
 
 		if ( rval == -1 ){
-			fprintf (stderr, "%s: cannot set data-link type: %s\n", argv[0], pcap_geterr (pcap_session[i].handle));
+			fprintf (stderr, "%s: interface '%s', cannot set data-link type: %s\n", argv[0], filter_iter->name, pcap_geterr (pcap_session[i].handle));
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -405,7 +405,7 @@ main (int argc, char *argv[])
 			rval = pcap_compile (pcap_session[i].handle, &bpf_prog, filter_iter->match, 0, PCAP_NETMASK_UNKNOWN);
 
 			if ( rval == -1 ){
-				fprintf (stderr, "%s: cannot compile the filter '%s' match rule: %s\n", argv[0], filter_iter->name, pcap_geterr (pcap_session[i].handle));
+				fprintf (stderr, "%s: device rule '%s', cannot compile a packet filter: %s\n", argv[0], filter_iter->name, pcap_geterr (pcap_session[i].handle));
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
@@ -413,7 +413,7 @@ main (int argc, char *argv[])
 			rval = pcap_setfilter (pcap_session[i].handle, &bpf_prog);
 
 			if ( rval == -1 ){
-				fprintf (stderr, "%s: cannot apply the filter '%s' on interface '%s': %s\n", argv[0], filter_iter->name, filter_iter->iface, pcap_geterr (pcap_session[i].handle));
+				fprintf (stderr, "%s: interface '%s', cannot apply a packet filter '%s': %s\n", argv[0], filter_iter->name, filter_iter->iface, pcap_geterr (pcap_session[i].handle));
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
@@ -424,7 +424,7 @@ main (int argc, char *argv[])
 		pcap_session[i].fd = pcap_get_selectable_fd (pcap_session[i].handle);
 
 		if ( pcap_session[i].fd == -1 ){
-			fprintf (stderr, "%s: cannot obtain file descriptor for packet capture interface '%s'\n", argv[0], filter_iter->iface);
+			fprintf (stderr, "%s: interface '%s', cannot obtain a file descriptor\n", argv[0], filter_iter->iface);
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -511,7 +511,7 @@ main (int argc, char *argv[])
 
 	openlog ("kenotaphd", syslog_flags, LOG_DAEMON);
 
-	syslog (LOG_INFO, "kenotaph-daemon started (loaded filters: %u)", filter_cnt);
+	syslog (LOG_INFO, "kenotaph-daemon started (loaded device rules: %u)", filter_cnt);
 
 	if ( opt.tcp_event )
 		syslog (LOG_INFO, "Event notifications available via %s:%s (ACCEPT_MAX: %u)", opt.hostname, opt.port, opt.accept_max);

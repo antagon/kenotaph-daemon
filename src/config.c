@@ -152,7 +152,7 @@ config_load (struct config *conf, const char *filename, char *errbuf)
 	filter_cnt = config_setting_length (root_setting);
 
 	if ( filter_cnt > CONF_FILTER_MAXCNT ){
-		snprintf (errbuf, CONF_ERRBUF_SIZE, "too many filters defined (max %d)", CONF_FILTER_MAXCNT);
+		snprintf (errbuf, CONF_ERRBUF_SIZE, "too many device rules defined (max %d)", CONF_FILTER_MAXCNT);
 		config_destroy (&libconfig);
 		return -1;
 	}
@@ -163,16 +163,15 @@ config_load (struct config *conf, const char *filename, char *errbuf)
 		filter = (struct config_filter*) calloc (1, sizeof (struct config_filter));
 
 		if ( filter == NULL ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "cannot allocate memory for filter");
+			snprintf (errbuf, CONF_ERRBUF_SIZE, "cannot allocate memory");
 			config_destroy (&libconfig);
 			return -1;
 		}
 
 		filter_setting = config_setting_get_elem (root_setting, i);
 
-		// Just in case... we do not want to touch the NULL pointer
 		if ( filter_setting == NULL ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "no filters defined");
+			snprintf (errbuf, CONF_ERRBUF_SIZE, "cannot get a device rule");
 			free (filter);
 			config_destroy (&libconfig);
 			return -1;
@@ -181,7 +180,7 @@ config_load (struct config *conf, const char *filename, char *errbuf)
 		str_val = config_setting_name (filter_setting);
 
 		if ( str_val == NULL ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "in %d. filter, missing filter name", i + 1);
+			snprintf (errbuf, CONF_ERRBUF_SIZE, "device rule %d, has no name id", i + 1);
 			free (filter);
 			config_unload (conf);
 			config_destroy (&libconfig);
@@ -189,7 +188,7 @@ config_load (struct config *conf, const char *filename, char *errbuf)
 		}
 
 		if ( strlen (str_val) > CONF_FILTER_NAME_MAXLEN ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "filter name too long");
+			snprintf (errbuf, CONF_ERRBUF_SIZE, "device rule %d, name too long", i + 1);
 			free (filter);
 			config_destroy (&libconfig);
 			return -1;
@@ -204,7 +203,7 @@ config_load (struct config *conf, const char *filename, char *errbuf)
 		filter_set_matchrule (filter, str_val);
 
 		if ( config_setting_lookup_int (filter_setting, "timeout", &num) == CONFIG_FALSE ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "in filter '%s', missing option 'timeout'", filter->name);
+			snprintf (errbuf, CONF_ERRBUF_SIZE, "device rule '%s', missing option 'timeout'", filter->name);
 			free (filter);
 			config_unload (conf);
 			config_destroy (&libconfig);
@@ -212,7 +211,7 @@ config_load (struct config *conf, const char *filename, char *errbuf)
 		}
 
 		if ( num == 0 ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "in filter '%s', 'timeout' must be >0", filter->name);
+			snprintf (errbuf, CONF_ERRBUF_SIZE, "device rule '%s', 'timeout' must be >0", filter->name);
 			free (filter);
 			config_unload (conf);
 			config_destroy (&libconfig);
@@ -234,7 +233,7 @@ config_load (struct config *conf, const char *filename, char *errbuf)
 		filter_set_promisc_mode (filter, num);
 
 		if ( config_setting_lookup_string (filter_setting, "interface", &str_val) == CONFIG_FALSE ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "in filter '%s', missing option 'interface'", filter->name);
+			snprintf (errbuf, CONF_ERRBUF_SIZE, "device rule '%s', missing option 'interface'", filter->name);
 			free (filter);
 			config_unload (conf);
 			config_destroy (&libconfig);
@@ -242,7 +241,7 @@ config_load (struct config *conf, const char *filename, char *errbuf)
 		}
 
 		if ( strlen (str_val) == 0 ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "in filter '%s', empty option 'interface'", filter->name);
+			snprintf (errbuf, CONF_ERRBUF_SIZE, "device rule '%s', empty option 'interface'", filter->name);
 			free (filter);
 			config_unload (conf);
 			config_destroy (&libconfig);
