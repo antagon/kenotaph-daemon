@@ -204,6 +204,7 @@ config_load (struct config *conf, const char *filename, char *errbuf)
 
 		if ( config_setting_lookup_int (filter_setting, "timeout", &num) == CONFIG_FALSE ){
 			snprintf (errbuf, CONF_ERRBUF_SIZE, "device rule '%s', missing option 'timeout'", filter->name);
+			filter_destroy (filter);
 			free (filter);
 			config_unload (conf);
 			config_destroy (&libconfig);
@@ -212,6 +213,7 @@ config_load (struct config *conf, const char *filename, char *errbuf)
 
 		if ( num == 0 ){
 			snprintf (errbuf, CONF_ERRBUF_SIZE, "device rule '%s', 'timeout' must be >0", filter->name);
+			filter_destroy (filter);
 			free (filter);
 			config_unload (conf);
 			config_destroy (&libconfig);
@@ -234,6 +236,7 @@ config_load (struct config *conf, const char *filename, char *errbuf)
 
 		if ( config_setting_lookup_string (filter_setting, "interface", &str_val) == CONFIG_FALSE ){
 			snprintf (errbuf, CONF_ERRBUF_SIZE, "device rule '%s', missing option 'interface'", filter->name);
+			filter_destroy (filter);
 			free (filter);
 			config_unload (conf);
 			config_destroy (&libconfig);
@@ -242,6 +245,7 @@ config_load (struct config *conf, const char *filename, char *errbuf)
 
 		if ( strlen (str_val) == 0 ){
 			snprintf (errbuf, CONF_ERRBUF_SIZE, "device rule '%s', empty option 'interface'", filter->name);
+			filter_destroy (filter);
 			free (filter);
 			config_unload (conf);
 			config_destroy (&libconfig);
