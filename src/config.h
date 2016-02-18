@@ -37,7 +37,7 @@ struct config
 	struct config_iface *tail;
 };
 
-extern int config_load (struct config *conf, const char *filename, char *errbuf);
+extern int config_load (struct config *conf, const char *filename);
 
 extern void config_unload (struct config *conf);
 

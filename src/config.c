@@ -72,7 +72,7 @@ cfg_validate_device_timeout (cfg_t *cfg, cfg_opt_t *opt)
 }
 
 int
-config_load (struct config *conf, const char *filename, char *errbuf)
+config_load (struct config *conf, const char *filename)
 {
 	cfg_t *cfg, *cfg_iface, *cfg_dev;
 	struct config_iface *conf_iface;
