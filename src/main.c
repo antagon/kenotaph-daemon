@@ -131,6 +131,7 @@ main (int argc, char *argv[])
 	memset (&path_config, 0, sizeof (struct pathname));
 	memset (&conf, 0, sizeof (struct config));
 	memset (&opt, 0, sizeof (struct option_data));
+	memset (&addr_hint, 0, sizeof (struct addrinfo));
 
 	opt.ip_version = AF_UNSPEC;
 	opt.accept_max = ACCEPT_MAX;
@@ -145,7 +146,7 @@ main (int argc, char *argv[])
 				rval = hostport_parse (optarg, opt.hostname, opt.port);
 
 				if ( rval == -1 || strlen (opt.hostname) == 0 || strlen (opt.port) == 0 ){
-					fprintf (stderr, "%s: option '-t, --hostname' has invalid format (expects HOSTNAME:PORT)\n", argv[0]);
+					fprintf (nstderr, "%s: option '-t, --hostname' has invalid format (expects HOSTNAME:PORT)\n", argv[0]);
 					exitno = EXIT_FAILURE;
 					goto cleanup;
 				}
@@ -165,13 +166,13 @@ main (int argc, char *argv[])
 				rval = sscanf (optarg, "%u", &(opt.accept_max));
 
 				if ( rval < 1 ){
-					fprintf (stderr, "%s: option '-m, --accept-max' has invalid format (expects a number)\n", argv[0]);
+					fprintf (nstderr, "%s: option '-m, --accept-max' has invalid format (expects a number)\n", argv[0]);
 					exitno = EXIT_FAILURE;
 					goto cleanup;
 				}
 
 				if ( opt.accept_max == 0 ){
-					fprintf (stderr, "%s: option '-m, --accept-max' has invalid format (expects a number >0)\n", argv[0]);
+					fprintf (nstderr, "%s: option '-m, --accept-max' has invalid format (expects a number >0)\n", argv[0]);
 					exitno = EXIT_FAILURE;
 					goto cleanup;
 				}
@@ -201,16 +202,48 @@ main (int argc, char *argv[])
 	// Check if there are some non-option arguments, these are treated as paths
 	// to configuration files.
 	if ( (argc - optind) == 0 ){
-		fprintf (stderr, "%s: configuration file not specified. Use '--help' to see usage information.\n", argv[0]);
+		fprintf (nstderr, "%s: configuration file not specified. Use '--help' to see usage information.\n", argv[0]);
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
 
 	if ( opt.tcp_event == 0 ){
-		fprintf (stderr, "%s: daemon not binded to any hostname and port. Use '--help' to see usage information.\n", argv[0]);
+		fprintf (nstderr, "%s: daemon not binded to any hostname and port. Use '--help' to see usage information.\n", argv[0]);
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
+
+	// Change working directory to match the dirname of the config file.
+	rval = path_split (argv[optind], &path_config);
+
+	if ( rval != 0 ){
+		fprintf (nstderr, "%s: cannot split path to a configuration file.\n", argv[0]);
+		exitno = EXIT_FAILURE;
+		goto cleanup;
+	}
+
+	rval = chdir (path_config.dir);
+
+	if ( rval == -1 ){
+		fprintf (nstderr, "%s: cannot change directory to '%s': %s\n", argv[0], path_config.dir, strerror (errno));
+		exitno = EXIT_FAILURE;
+		goto cleanup;
+	}
+
+	filter_cnt = config_load (&conf, path_config.base);
+
+	if ( filter_cnt == -1 ){
+		fprintf (stderr, "%s: cannot load a configuration file '%s': %s\n", argv[0], argv[optind], strerror (errno));
+		exitno = EXIT_FAILURE;
+		goto cleanup;
+	} else if ( filter_cnt == 0 ){
+		fprintf (nstderr, "%s: no device rules were found, nothing to do...\n", argv[0]);
+		exitno = EXIT_FAILURE;
+		goto cleanup;
+	}
+
+	// No longer needed, free the resources
+	path_free (&path_config);
 
 	//
 	// Daemonize the process if the flag was set
@@ -295,43 +328,6 @@ main (int argc, char *argv[])
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
-
-	// Change working directory to match the dirname of the config file.
-	rval = path_split (argv[optind], &path_config);
-
-	if ( rval != 0 ){
-		fprintf (nstderr, "%s: cannot split path to a configuration file.\n", argv[0]);
-		exitno = EXIT_FAILURE;
-		goto cleanup;
-	}
-
-	rval = chdir (path_config.dir);
-
-	if ( rval == -1 ){
-		fprintf (nstderr, "%s: cannot change directory to '%s': %s\n", argv[0], path_config.dir, strerror (errno));
-		exitno = EXIT_FAILURE;
-		goto cleanup;
-	}
-
-	//
-	// Load configuration file
-	//
-	filter_cnt = config_load (&conf, path_config.base, conf_errbuff);
-
-	if ( filter_cnt == -1 ){
-		//fprintf (stderr, "%s: cannot load a configuration file '%s': %s\n", argv[0], argv[optind], conf_errbuff);
-		exitno = EXIT_FAILURE;
-		goto cleanup;
-	} else if ( filter_cnt == 0 ){
-		fprintf (nstderr, "%s: no device rules were found, nothing to do...\n", argv[0]);
-		exitno = EXIT_FAILURE;
-		goto cleanup;
-	}
-
-	// No longer needed, free the resources
-	path_free (&path_config);
-
-	memset (&addr_hint, 0, sizeof (struct addrinfo));
 
 	// Setup addrinfo hints
 	addr_hint.ai_family = opt.ip_version;
