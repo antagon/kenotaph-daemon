@@ -5,7 +5,7 @@
 #define _CONFIG_H
 
 #define CONF_DEVNAME_MAXLEN 64
-#define CONF_ERRBUF_SIZE 256
+#define CONF_ERRBUF_SIZE 1024
 
 enum
 {
