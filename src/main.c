@@ -43,6 +43,17 @@ struct option_data
 
 static int main_loop;
 static int exitno;
+static struct option opt_long[] = {
+	{ "", no_argument, NULL, '4' },
+	{ "", no_argument, NULL, '6' },
+	{ "hostname", required_argument, NULL, 't' },
+	{ "daemon", no_argument, NULL, 'd' },
+	{ "accept-max", required_argument, NULL, 'm' },
+	{ "verbose", no_argument, NULL, 'V' },
+	{ "help", no_argument, NULL, 'h' },
+	{ "version", no_argument, NULL, 'v' },
+	{ NULL, 0, NULL, 0 }
+};
 
 static void
 kenotaphd_help (const char *p)
@@ -77,11 +88,12 @@ kenotaphd_sigdie (int signo)
 int
 main (int argc, char *argv[])
 {
+	FILE *nstderr;
 	struct pollfd *poll_fd;
-	struct config conf;
 	struct config_iface *confif_iter;
 	struct config_dev *confdev_iter;
 	struct session_data *pcap_session;
+	struct config conf;
 	char *nmsg_buff;
 	struct nmsg_text nmsg_text;
 	struct nmsg_node *nmsg_node;
@@ -100,26 +112,17 @@ main (int argc, char *argv[])
 	time_t current_time;
 	struct sigaction sa;
 	struct addrinfo *host_addr, addr_hint;
-	struct option opt_long[] = {
-		{ "", no_argument, NULL, '4' },
-		{ "", no_argument, NULL, '6' },
-		{ "hostname", required_argument, NULL, 't' },
-		{ "daemon", no_argument, NULL, 'd' },
-		{ "accept-max", required_argument, NULL, 'm' },
-		{ "verbose", no_argument, NULL, 'V' },
-		{ "help", no_argument, NULL, 'h' },
-		{ "version", no_argument, NULL, 'v' },
-		{ NULL, 0, NULL, 0 }
-	};
 	pid_t pid;
-	int i, c, j, rval, syslog_flags, opt_index, opt_val, filter_cnt, sock, poll_len, link_type;
+	int i, c, j, rval, syslog_flags, opt_index, opt_val, filter_cnt,
+			sock, poll_len, link_type, pipe_fd[2];
 
 	sock = -1;
 	poll_fd = NULL;
 	pcap_session = NULL;
 	host_addr = NULL;
-	exitno = EXIT_SUCCESS;
 	syslog_flags = LOG_PID | LOG_PERROR;
+	nstderr = stderr;
+	exitno = EXIT_SUCCESS;
 #ifdef DBG_AVG_LOOP_SPEED
 	clock_avg = 0;
 #endif
@@ -209,11 +212,95 @@ main (int argc, char *argv[])
 		goto cleanup;
 	}
 
+	//
+	// Daemonize the process if the flag was set
+	//
+	if ( opt.daemon == 1 ){
+
+		if ( pipe (pipe_fd) == -1 ){
+			fprintf (stderr, "%s: cannot open pipe: %s\n", argv[0], strerror (errno));
+			exitno = EXIT_FAILURE;
+			goto cleanup;
+		}
+
+		pid = fork ();
+
+		if ( pid == -1 ){
+			fprintf (stderr, "%s: cannot daemonize the process (fork failed).\n", argv[0]);
+			exitno = EXIT_FAILURE;
+			goto cleanup;
+		}
+
+		// Parent process...
+		if ( pid > 0 ){
+			close (pipe_fd[1]);
+
+			nmsg_len = read (pipe_fd[0], conf_errbuff, sizeof (conf_errbuff));
+
+			conf_errbuff[nmsg_len - 1] = '\0';
+
+			if ( nmsg_len == -1 ){
+				fprintf (stderr, "daemonize: noerror\n");
+				exitno = EXIT_FAILURE;
+			} else if ( nmsg_len == 0 ){
+				exitno = EXIT_SUCCESS;
+			} else {
+				fprintf (stderr, "%s\n", conf_errbuff);
+				exitno = EXIT_FAILURE;
+			}
+
+			close (pipe_fd[0]);
+			goto cleanup;
+
+		} else {
+			close (pipe_fd[0]);
+
+			nstderr = fdopen (pipe_fd[1], "w");
+
+			if ( nstderr == NULL ){
+				fprintf (stderr, "%s: cannot convert fd to FILE structure: %s\n", argv[0], strerror (errno));
+				exitno = EXIT_FAILURE;
+				goto cleanup;
+			}
+		}
+
+		if ( setsid () == -1 ){
+			fprintf (stderr, "%s: cannot daemonize the process (setsid failed).\n", argv[0]);
+			exitno = EXIT_FAILURE;
+			goto cleanup;
+		}
+
+		umask (0);
+
+		freopen ("/dev/null", "r", stdin);
+		freopen ("/dev/null", "w", stdout);
+		freopen ("/dev/null", "w", stderr);
+		syslog_flags = LOG_PID;
+	}
+
+	//
+	// Setup signal handler
+	//
+	sa.sa_handler = kenotaphd_sigdie;
+	sigemptyset (&(sa.sa_mask));
+	sa.sa_flags = 0;
+
+	rval = 0;
+	rval &= sigaction (SIGINT, &sa, NULL);
+	rval &= sigaction (SIGQUIT, &sa, NULL);
+	rval &= sigaction (SIGTERM, &sa, NULL);
+
+	if ( rval != 0 ){
+		fprintf (nstderr, "%s: cannot setup signal handler: %s\n", argv[0], strerror (errno));
+		exitno = EXIT_FAILURE;
+		goto cleanup;
+	}
+
 	// Change working directory to match the dirname of the config file.
 	rval = path_split (argv[optind], &path_config);
 
 	if ( rval != 0 ){
-		fprintf (stderr, "%s: cannot split path to a configuration file.\n", argv[0]);
+		fprintf (nstderr, "%s: cannot split path to a configuration file.\n", argv[0]);
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -221,7 +308,7 @@ main (int argc, char *argv[])
 	rval = chdir (path_config.dir);
 
 	if ( rval == -1 ){
-		fprintf (stderr, "%s: cannot change directory to '%s': %s\n", argv[0], path_config.dir, strerror (errno));
+		fprintf (nstderr, "%s: cannot change directory to '%s': %s\n", argv[0], path_config.dir, strerror (errno));
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -236,7 +323,7 @@ main (int argc, char *argv[])
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	} else if ( filter_cnt == 0 ){
-		fprintf (stderr, "%s: no device rules were found, nothing to do...\n", argv[0]);
+		fprintf (nstderr, "%s: no device rules were found, nothing to do...\n", argv[0]);
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -254,7 +341,7 @@ main (int argc, char *argv[])
 	rval = getaddrinfo (opt.hostname, opt.port, &addr_hint, &host_addr);
 
 	if ( rval != 0 ){
-		fprintf (stderr, "%s: hostname resolve failed: %s\n", argv[0], gai_strerror (rval));
+		fprintf (nstderr, "%s: hostname resolve failed: %s\n", argv[0], gai_strerror (rval));
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -263,7 +350,7 @@ main (int argc, char *argv[])
 
 	if ( sock == -1 ){
 		freeaddrinfo (host_addr);
-		fprintf (stderr, "%s: cannot create a socket: %s\n", argv[0], strerror (errno));
+		fprintf (nstderr, "%s: cannot create a socket: %s\n", argv[0], strerror (errno));
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -272,7 +359,7 @@ main (int argc, char *argv[])
 
 	if ( setsockopt (sock, SOL_SOCKET, SO_REUSEADDR, &opt_val, sizeof (opt_val)) == -1 ){
 		freeaddrinfo (host_addr);
-		fprintf (stderr, "%s: cannot set socket options: %s\n", argv[0], strerror (errno));
+		fprintf (nstderr, "%s: cannot set socket options: %s\n", argv[0], strerror (errno));
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -281,7 +368,7 @@ main (int argc, char *argv[])
 
 	if ( rval == -1 ){
 		freeaddrinfo (host_addr);
-		fprintf (stderr, "%s: cannot bind to address: %s\n", argv[0], strerror (errno));
+		fprintf (nstderr, "%s: cannot bind to address: %s\n", argv[0], strerror (errno));
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -290,7 +377,7 @@ main (int argc, char *argv[])
 
 	if ( rval == -1 ){
 		freeaddrinfo (host_addr);
-		fprintf (stderr, "%s: %s\n", argv[0], strerror (errno));
+		fprintf (nstderr, "%s: %s\n", argv[0], strerror (errno));
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -300,7 +387,7 @@ main (int argc, char *argv[])
 	pcap_session = (struct session_data*) calloc (filter_cnt, sizeof (struct session_data));
 
 	if ( pcap_session == NULL ){
-		fprintf (stderr, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
+		fprintf (nstderr, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -319,7 +406,7 @@ main (int argc, char *argv[])
 			pcap_session[i].filter_name = strdup (confdev_iter->name);
 
 			if ( pcap_session[i].filter_name == NULL ){
-				fprintf (stderr, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
+				fprintf (nstderr, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
@@ -327,7 +414,7 @@ main (int argc, char *argv[])
 			pcap_session[i].handle = pcap_create (confif_iter->name, pcap_errbuff);
 
 			if ( pcap_session[i].handle == NULL ){
-				fprintf (stderr, "%s: cannot use network interface: %s\n", argv[0], pcap_errbuff);
+				fprintf (nstderr, "%s: cannot use network interface: %s\n", argv[0], pcap_errbuff);
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
@@ -335,7 +422,7 @@ main (int argc, char *argv[])
 			rval = pcap_set_rfmon (pcap_session[i].handle, (confif_iter->mode & CONF_IF_MONITOR));
 
 			if ( rval != 0 ){
-				fprintf (stderr, "%s: interface '%s', cannot enable monitor mode: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
+				fprintf (nstderr, "%s: interface '%s', cannot enable monitor mode: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
@@ -343,7 +430,7 @@ main (int argc, char *argv[])
 			rval = pcap_set_promisc (pcap_session[i].handle, (confif_iter->mode & CONF_IF_PROMISC));
 
 			if ( rval != 0 ){
-				fprintf (stderr, "%s: interface '%s', cannot enable promiscuous mode: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
+				fprintf (nstderr, "%s: interface '%s', cannot enable promiscuous mode: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
@@ -351,7 +438,7 @@ main (int argc, char *argv[])
 			rval = pcap_set_timeout (pcap_session[i].handle, SELECT_TIMEOUT_MS);
 
 			if ( rval != 0 ){
-				fprintf (stderr, "%s: interface '%s', cannot set read timeout: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
+				fprintf (nstderr, "%s: interface '%s', cannot set read timeout: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
@@ -359,7 +446,7 @@ main (int argc, char *argv[])
 			rval = pcap_setnonblock (pcap_session[i].handle, 1, pcap_errbuff);
 
 			if ( rval == -1 ){
-				fprintf (stderr, "%s: interface '%s', cannot set pcap resource to nonblock: %s\n", argv[0], confif_iter->name, pcap_errbuff);
+				fprintf (nstderr, "%s: interface '%s', cannot set pcap resource to nonblock: %s\n", argv[0], confif_iter->name, pcap_errbuff);
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
@@ -367,7 +454,7 @@ main (int argc, char *argv[])
 			rval = pcap_activate (pcap_session[i].handle);
 
 			if ( rval != 0 ){
-				fprintf (stderr, "%s: interface '%s', cannot activate a packet capture: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
+				fprintf (nstderr, "%s: interface '%s', cannot activate a packet capture: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
@@ -377,7 +464,7 @@ main (int argc, char *argv[])
 				link_type = pcap_datalink_name_to_val (confif_iter->link_type);
 
 				if ( link_type == -1 ){
-					fprintf (stderr, "%s: device rule '%s', unknown link-layer type '%s'\n", argv[0], confdev_iter->name, confif_iter->link_type);
+					fprintf (nstderr, "%s: device rule '%s', unknown link-layer type '%s'\n", argv[0], confdev_iter->name, confif_iter->link_type);
 					exitno = EXIT_FAILURE;
 					goto cleanup;
 				}
@@ -398,7 +485,7 @@ main (int argc, char *argv[])
 			rval = pcap_set_datalink (pcap_session[i].handle, link_type);
 
 			if ( rval == -1 ){
-				fprintf (stderr, "%s: interface '%s', cannot set data-link type: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
+				fprintf (nstderr, "%s: interface '%s', cannot set data-link type: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
@@ -409,7 +496,7 @@ main (int argc, char *argv[])
 				rval = pcap_compile (pcap_session[i].handle, &bpf_prog, confdev_iter->match, 0, PCAP_NETMASK_UNKNOWN);
 
 				if ( rval == -1 ){
-					fprintf (stderr, "%s: device rule '%s', cannot compile a packet filter: %s\n", argv[0], confdev_iter->name, pcap_geterr (pcap_session[i].handle));
+					fprintf (nstderr, "%s: device rule '%s', cannot compile a packet filter: %s\n", argv[0], confdev_iter->name, pcap_geterr (pcap_session[i].handle));
 					exitno = EXIT_FAILURE;
 					goto cleanup;
 				}
@@ -417,7 +504,7 @@ main (int argc, char *argv[])
 				rval = pcap_setfilter (pcap_session[i].handle, &bpf_prog);
 
 				if ( rval == -1 ){
-					fprintf (stderr, "%s: interface '%s', cannot apply a packet filter: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
+					fprintf (nstderr, "%s: interface '%s', cannot apply a packet filter: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
 					exitno = EXIT_FAILURE;
 					goto cleanup;
 				}
@@ -428,7 +515,7 @@ main (int argc, char *argv[])
 			pcap_session[i].fd = pcap_get_selectable_fd (pcap_session[i].handle);
 
 			if ( pcap_session[i].fd == -1 ){
-				fprintf (stderr, "%s: interface '%s', cannot obtain a file descriptor\n", argv[0], confif_iter->name);
+				fprintf (nstderr, "%s: interface '%s', cannot obtain a file descriptor\n", argv[0], confif_iter->name);
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
@@ -446,7 +533,7 @@ main (int argc, char *argv[])
 	poll_fd = (struct pollfd*) malloc (sizeof (struct pollfd) * poll_len);
 
 	if ( poll_fd == NULL ){
-		fprintf (stderr, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
+		fprintf (nstderr, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -467,51 +554,9 @@ main (int argc, char *argv[])
 		poll_fd[i].revents = 0;
 	}
 
-	//
-	// Setup signal handler
-	//
-	sa.sa_handler = kenotaphd_sigdie;
-	sigemptyset (&(sa.sa_mask));
-	sa.sa_flags = 0;
-
-	rval = 0;
-	rval &= sigaction (SIGINT, &sa, NULL);
-	rval &= sigaction (SIGQUIT, &sa, NULL);
-	rval &= sigaction (SIGTERM, &sa, NULL);
-
-	if ( rval != 0 ){
-		fprintf (stderr, "%s: cannot setup signal handler: %s\n", argv[0], strerror (errno));
-		exitno = EXIT_FAILURE;
-		goto cleanup;
-	}
-
-	//
-	// Daemonize the process if the flag was set
-	//
-	if ( opt.daemon == 1 ){
-		pid = fork ();
-
-		if ( pid > 0 ){
-			exitno = EXIT_SUCCESS;
-			goto cleanup;
-		} else if ( pid == -1 ){
-			fprintf (stderr, "%s: cannot daemonize the process (fork failed).\n", argv[0]);
-			exitno = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		if ( setsid () == -1 ){
-			fprintf (stderr, "%s: cannot daemonize the process (setsid failed).\n", argv[0]);
-			exitno = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		umask (0);
-
-		freopen ("/dev/null", "r", stdin);
-		freopen ("/dev/null", "w", stdout);
-		freopen ("/dev/null", "w", stderr);
-		syslog_flags = LOG_PID;
+	if ( nstderr != stderr ){
+		fclose (nstderr);
+		nstderr = NULL;
 	}
 
 	openlog ("kenotaphd", syslog_flags, LOG_DAEMON);
@@ -663,7 +708,7 @@ main (int argc, char *argv[])
 			}
 
 			if ( opt.verbose )
-				syslog (LOG_INFO, "%s:%s", pcap_session[i].filter_name, evt_str);
+				syslog (LOG_INFO, "%s %s", pcap_session[i].filter_name, evt_str);
 
 			strncpy (nmsg_text.id, pcap_session[i].filter_name, NMSG_ID_MAXLEN);
 			nmsg_text.id[NMSG_ID_MAXLEN] = '\0';
@@ -674,7 +719,7 @@ main (int argc, char *argv[])
 			nmsg_node = nmsg_node_new (&nmsg_text);
 
 			if ( nmsg_node == NULL ){
-				fprintf (stderr, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
+				syslog (LOG_ERR, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
@@ -685,7 +730,7 @@ main (int argc, char *argv[])
 		nmsg_len = nmsg_queue_serialize (&nmsg_que, &nmsg_buff);
 
 		if ( nmsg_len == -1 ){
-			fprintf (stderr, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
+			syslog (LOG_ERR, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -722,6 +767,9 @@ main (int argc, char *argv[])
 
 cleanup:
 	closelog ();
+
+	if ( nstderr != NULL )
+		fclose (nstderr);
 
 	if ( pcap_session != NULL ){
 		for ( i = 0; i < filter_cnt; i++ )
