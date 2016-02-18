@@ -12,14 +12,14 @@ kenotaphd \- detect a presence of a network device
 .I config-file
 .SH DESCRIPTION
 .B kenotaphd
-is a tool for detecting a presence of network devices through means of a packet capture. Both Wired and Wireless networks are supported, assuming appropriate hardware is available. Targetted device is described by a user defined Berkeley Packet Filter, either by its IP address or Hardware address, however the use of BPF allows to use more complex examples. A packet capture is done in promiscuous mode, or in monitor mode for Wireless network interfaces.
+is a tool for detecting a presence of network devices through means of a packet capture. Both Wired and Wireless networks are supported, assuming appropriate hardware is available. Targetted device is described by a user defined Berkeley Packet Filter, either by its IP address or Hardware address, however the use of BPF allows for higher complexity. A packet capture is done in promiscuous mode, and/or in monitor mode.
 
 .B kenotaphd
 is designed to be a 'daemon' program that runs in the background. To communicate with other components, a TCP/IP socket is opened on a defined
 .I PORT
-and binded to a
+binded to a
 .I HOSTNAME
-, which can be specified as an IP address or as a domain name, the latter gets resolved to either IPv4 address or IPv6 address. How the domain name gets resolved can be controlled with available options. When a targetted device becomes present on a network, or becomes absent, a notification message is sent to all consumers connected to the socket.
+specified as an IP address or as a domain name, latter gets resolved to either IPv4 or IPv6 address. How the domain name gets resolved can be controlled with available options. When a targetted device becomes present on a network, or becomes absent, a notification message is sent to all consumers connected to the socket.
 
 A notification message is an ASCII formatted string that consists of two fields separated by a semicolon (':'). The first field contains an ID, which corresponds to a name of a device definition found in a configuration file, and the second contains a name of the event. Whole message is terminated with a newline ('\\n') character.
 .SH OPTIONS
