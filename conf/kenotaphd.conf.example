@@ -1,8 +1,55 @@
-test_filter: {
-	interface = "wlp3s0";
-	match = "ether host 48:9D:24:66:A7:97";
-	link_type = "EN10MB";
-	monitor_mode = false;
-	promisc_mode = true;
-	timeout = 10;
+/*
+ * Example configuration file for kenotaph-daemon.
+ */
+
+/*
+ * Capture on Wireless interface in monitor mode.
+ */
+interface wlan0
+{
+	// Enable monitor mode, if supported. Monitor mode is disabled by default.
+	monitor_mode = true
+
+	// Enable promiscuous mode. Promiscuous mode is enabled by default.
+	promisc_mode = true
+
+	// Use default link_type, otherwise this value would override it.
+	//link_type = "EN10MB"
+
+	// Enable or disable this interface section. By setting this value to
+	// false, everything inside this section will be ignored.
+	enabled = true
+
+	device mydevice1
+	{
+		// Berkeley Packet Filter describing how to match packets belonging to
+		// a device.
+		match = "ether host aa:bb:cc:dd:ee:f1"
+
+		// Maximum time spent waiting for another matched packet. If this value
+		// is exceeded, device is pronounced absent.
+		timeout = 900
+	}
+
+	// ... define other devices
 }
+
+/*
+ * Capture on Ethernet interface.
+ */
+interface eth0
+{
+	device officeprinter
+	{
+		match = "ip host hpprinter"
+		timeout = 3600
+	}
+
+	device homeserver
+	{
+		match = "ip host 192.168.1.52 or ip host 192.168.1.60"
+		timeout = 200
+	}
+}
+
+
