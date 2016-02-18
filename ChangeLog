@@ -1,10 +1,11 @@
 version 1.0.0
 -------------
 
-* Initial version release. Source is based on etherpoke v2.5.0, though many
-parts related to execution of event hooks were removed, and other parts were
-tuned-up for performance. Format of a configuration has changed, number of
-options was substantially lowered, and some options were renamed.
+* Initial version release. Source is based on etherpoke v2.5.0, all parts
+related to execution of event hooks were removed, sending of the socket
+notifications has been overhauled to achieve better performance.
+
+* libconfig replaced by libconfuse.
 
 * Make '-t, --hostname' mandatory, as there is no other purpose but to send
 notifications via TCP/IP.
@@ -13,5 +14,8 @@ notifications via TCP/IP.
 promiscuous mode of a NIC card. This option was not present in the original
 source code. By default, promiscuous mode is enabled.
 
-* Send notifications to a single client in burst mode.
+* Send notifications to single client in burst mode.
+
+* Do not define interface as an option for each device rule, instead, use an
+adjacent group of which all device rules are part of.
 
