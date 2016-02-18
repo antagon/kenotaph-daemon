@@ -22,7 +22,7 @@ clean:
 	rm -f *.o $(TARGET)
 
 $(TARGET): main.o config.o session_data.o pathname.o hostport_parser.o nmsg_queue.o
-	$(CC) $(CFLAGS) $^ -o $(TARGET) -lpcap -lconfig
+	$(CC) $(CFLAGS) $^ -o $(TARGET) -lpcap -lconfuse
 
 main.o: main.c
 	$(CC) $(CFLAGS) -c $<

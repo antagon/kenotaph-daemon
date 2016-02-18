@@ -1,294 +1,234 @@
 /*
  * Copyright (c) 2016, CodeWard.org
  */
+#include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <libconfig.h>
+#include <errno.h>
+#include <confuse.h>
 
 #include "config.h"
 
-static int
-filter_set_name (struct config_filter *filter, const char *name)
-{
-	if ( filter->name != NULL )
-		free (filter->name);
+static cfg_opt_t dev_opts[] = {
+	CFG_STR ("match", NULL, CFGF_NODEFAULT),
+	CFG_INT ("timeout", 33, CFGF_NODEFAULT),
+	CFG_END ()
+};
 
-	if ( name == NULL ){
-		filter->name = NULL;
-		return 0;
+static cfg_opt_t iface_opts[] = {
+	CFG_BOOL ("monitor_mode", cfg_false, CFGF_NONE),
+	CFG_BOOL ("promisc_mode", cfg_true, CFGF_NONE),
+	CFG_BOOL ("enabled", cfg_true, CFGF_NONE),
+	CFG_STR ("link_type", NULL, CFGF_NODEFAULT),
+	CFG_SEC ("device", dev_opts, CFGF_TITLE | CFGF_MULTI | CFGF_NO_TITLE_DUPES),
+	CFG_FUNC ("include", cfg_include),
+	CFG_END ()
+};
+
+static cfg_opt_t conf_opts[] = {
+	CFG_SEC ("interface", iface_opts, CFGF_TITLE | CFGF_MULTI | CFGF_NO_TITLE_DUPES),
+	CFG_FUNC ("include", cfg_include),
+	CFG_END ()
+};
+
+static int
+cfg_validate_device (cfg_t *cfg, cfg_opt_t *opt)
+{
+	cfg_t *dev;
+
+	dev = cfg_opt_getnsec (opt, cfg_opt_size (opt) - 1);
+
+	if ( strlen (cfg_title (dev)) > CONF_DEVNAME_MAXLEN ){
+		cfg_error (cfg, "device name too long (max %d)", CONF_DEVNAME_MAXLEN);
+		return -1;
 	}
 
-	filter->name = strdup (name);
-	
-	if ( filter->name == NULL )
-		return 1;
-	
+	if ( cfg_size (dev, "match") == 0 ){
+		cfg_error (cfg, "missing mandatory option 'match'");
+		return -1;
+	}
+
+	if ( cfg_size (dev, "timeout") == 0 ){
+		cfg_error (cfg, "missing mandatory option 'timeout'");
+		return -1;
+	}
+
 	return 0;
 }
 
 static int
-filter_set_matchrule (struct config_filter *filter, const char *rule)
+cfg_validate_device_timeout (cfg_t *cfg, cfg_opt_t *opt)
 {
-	if ( filter->match != NULL )
-		free (filter->match);
+	long int val;
 
-	if ( rule == NULL ){
-		filter->match = NULL;
-		return 0;
+	val = cfg_opt_getnint (opt, 0);
+
+	if ( val <= 0 ){
+		cfg_error (cfg, "option 'timeout' must be >0");
+		return -1;
 	}
 
-	filter->match = strdup (rule);
-
-	if ( filter->match == NULL )
-		return 1;
-	
 	return 0;
-}
-
-static int
-filter_set_interface (struct config_filter *filter, const char *interface)
-{
-	if ( filter->iface != NULL )
-		free (filter->iface);
-
-	if ( interface == NULL ){
-		filter->iface = NULL;
-		return 0;
-	}
-
-	filter->iface = strdup (interface);
-
-	if ( filter->iface == NULL )
-		return 1;
-	
-	return 0;
-}
-
-static inline void
-filter_set_timeout (struct config_filter *filter, uint32_t timeout)
-{
-	filter->timeout = timeout;
-}
-
-static inline void
-filter_set_monitor_mode (struct config_filter *filter, uint8_t monitor_mode)
-{
-	filter->rfmon = monitor_mode;
-}
-
-static inline void
-filter_set_promisc_mode (struct config_filter *filter, uint8_t promisc_mode)
-{
-	filter->promisc = promisc_mode;
-}
-
-static int
-filter_set_link_type (struct config_filter *filter, const char *link_type)
-{
-	if ( filter->link_type != NULL )
-		free (filter->link_type);
-
-	if ( link_type == NULL ){
-		filter->link_type = NULL;
-		return 1;
-	}
-
-	filter->link_type = strdup (link_type);
-
-	if ( filter->link_type == NULL )
-		return 1;
-
-	return 0;
-}
-
-static void
-filter_destroy (struct config_filter *filter)
-{
-	if ( filter->name != NULL )
-		free (filter->name);
-	if ( filter->match != NULL )
-		free (filter->match);
-	if ( filter->iface != NULL )
-		free (filter->iface);
-	if ( filter->link_type != NULL )
-		free (filter->link_type);
 }
 
 int
 config_load (struct config *conf, const char *filename, char *errbuf)
 {
-	config_t libconfig;
-	config_setting_t *root_setting;
-	config_setting_t *filter_setting;
-	struct config_filter *filter;
-	struct stat fstat;
-	const char *str_val;
-	int i, filter_cnt, num;
+	cfg_t *cfg, *cfg_iface, *cfg_dev;
+	struct config_iface *conf_iface;
+	struct config_dev *conf_dev, **conf_dev_tail;
+	int i, j, cnt;
+	char *str_val;
 
-	config_init (&libconfig);
+	cnt = 0;
 
-	if ( stat (filename, &fstat) == -1 ){
-		snprintf (errbuf, CONF_ERRBUF_SIZE, "%s", strerror (errno));
-		config_destroy (&libconfig);
-		return -1;
+	cfg = cfg_init (conf_opts, CFGF_NONE);
+
+	cfg_set_validate_func (cfg, "interface|device", cfg_validate_device);
+	cfg_set_validate_func (cfg, "interface|device|timeout", cfg_validate_device_timeout);
+
+	switch ( cfg_parse (cfg, filename) ){
+		case CFG_FILE_ERROR:
+			cnt = -1;
+			goto cleanup;
+
+		case CFG_PARSE_ERROR:
+			cnt = -1;
+			goto cleanup;
 	}
 
-	if ( S_ISDIR (fstat.st_mode) ){
-		snprintf (errbuf, CONF_ERRBUF_SIZE, "is a directory");
-		config_destroy (&libconfig);
-		return -1;
-	}
+	for ( i = 0; i < cfg_size (cfg, "interface"); i++ ){
+		cfg_iface = cfg_getnsec (cfg, "interface", i);
 
-	if ( config_read_file (&libconfig, filename) == CONFIG_FALSE ){
-		snprintf (errbuf, CONF_ERRBUF_SIZE, "%s on line %d", config_error_text (&libconfig), config_error_line (&libconfig));
-		config_destroy (&libconfig);
-		return -1;
-	}
+		conf_iface = (struct config_iface*) calloc (1, sizeof (struct config_iface));
 
-	root_setting = config_root_setting (&libconfig);
-	filter_cnt = config_setting_length (root_setting);
-
-	if ( filter_cnt > CONF_FILTER_MAXCNT ){
-		snprintf (errbuf, CONF_ERRBUF_SIZE, "too many device rules defined (max %d)", CONF_FILTER_MAXCNT);
-		config_destroy (&libconfig);
-		return -1;
-	}
-
-	memset (errbuf, 0, sizeof (CONF_ERRBUF_SIZE));
-
-	for ( i = 0; i < filter_cnt; i++ ){
-		filter = (struct config_filter*) calloc (1, sizeof (struct config_filter));
-
-		if ( filter == NULL ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "cannot allocate memory");
-			config_destroy (&libconfig);
-			return -1;
+		if ( conf_iface == NULL ){
+			cnt = -1;
+			goto cleanup;
 		}
 
-		filter_setting = config_setting_get_elem (root_setting, i);
+		conf_iface->name = strdup (cfg_title (cfg_iface));
 
-		if ( filter_setting == NULL ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "cannot get a device rule");
-			free (filter);
-			config_destroy (&libconfig);
-			return -1;
+		if ( conf_iface->name == NULL ){
+			free (conf_iface);
+			cnt = -1;
+			goto cleanup;
 		}
 
-		str_val = config_setting_name (filter_setting);
+		str_val = cfg_getstr (cfg_iface, "link_type");
 
-		if ( str_val == NULL ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "device rule %d, has no name id", i + 1);
-			free (filter);
-			config_unload (conf);
-			config_destroy (&libconfig);
-			return -1;
+		if ( str_val != NULL ){
+			conf_iface->link_type = strdup (str_val);
+
+			if ( conf_iface->link_type == NULL ){
+				free (conf_iface);
+				cnt = -1;
+				goto cleanup;
+			}
 		}
 
-		if ( strlen (str_val) > CONF_FILTER_NAME_MAXLEN ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "device rule %d, name too long", i + 1);
-			free (filter);
-			config_destroy (&libconfig);
-			return -1;
+		if ( cfg_getbool (cfg_iface, "promisc_mode") == cfg_true )
+			conf_iface->mode |= CONF_IF_PROMISC;
+
+		if ( cfg_getbool (cfg_iface, "monitor_mode") == cfg_true )
+			conf_iface->mode |= CONF_IF_MONITOR;
+
+		if ( cfg_getbool (cfg_iface, "enabled") == cfg_true )
+			conf_iface->enabled = 1;
+		else
+			conf_iface->enabled = 0;
+
+		if ( cfg_size (cfg_iface, "device") == 0 )
+			conf_iface->enabled = 0;
+
+		conf_dev_tail = &(conf_iface->dev);
+
+		// Parse device sections
+		for ( j = 0; j < cfg_size (cfg_iface, "device"); j++ ){
+			cfg_dev = cfg_getnsec (cfg_iface, "device", j);
+
+			conf_dev = (struct config_dev*) calloc (1, sizeof (struct config_dev));
+
+			if ( conf_dev == NULL ){
+				free (conf_iface);
+				cnt = -1;
+				goto cleanup;
+			}
+
+			conf_dev->name = strdup (cfg_title (cfg_dev));
+
+			if ( conf_dev->name == NULL ){
+				free (conf_dev);
+				free (conf_iface);
+				cnt = -1;
+				goto cleanup;
+			}
+
+			conf_dev->match = strdup (cfg_getstr (cfg_dev, "match"));
+
+			if ( conf_dev->match == NULL ){
+				free (conf_dev);
+				free (conf_iface);
+				cnt = -1;
+				goto cleanup;
+			}
+
+			conf_dev->timeout = cfg_getint (cfg_dev, "timeout");
+
+			*conf_dev_tail = conf_dev;
+			conf_dev_tail = &((*conf_dev_tail)->next);
 		}
 
-		filter_set_name (filter, str_val);
-
-		if ( config_setting_lookup_string (filter_setting, "match", &str_val) == CONFIG_FALSE ){
-			str_val = NULL;
-		}
-
-		filter_set_matchrule (filter, str_val);
-
-		if ( config_setting_lookup_int (filter_setting, "timeout", &num) == CONFIG_FALSE ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "device rule '%s', missing option 'timeout'", filter->name);
-			filter_destroy (filter);
-			free (filter);
-			config_unload (conf);
-			config_destroy (&libconfig);
-			return -1;
-		}
-
-		if ( num == 0 ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "device rule '%s', 'timeout' must be >0", filter->name);
-			filter_destroy (filter);
-			free (filter);
-			config_unload (conf);
-			config_destroy (&libconfig);
-			return -1;
-		}
-	
-		filter_set_timeout (filter, ((num < 0)? (num * -1):num));
-
-		if ( config_setting_lookup_bool (filter_setting, "monitor_mode", &num) == CONFIG_FALSE ){
-			num = 0;
-		}
-
-		filter_set_monitor_mode (filter, num);
-
-		if ( config_setting_lookup_bool (filter_setting, "promisc_mode", &num) == CONFIG_FALSE ){
-			num = 1;
-		}
-
-		filter_set_promisc_mode (filter, num);
-
-		if ( config_setting_lookup_string (filter_setting, "interface", &str_val) == CONFIG_FALSE ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "device rule '%s', missing option 'interface'", filter->name);
-			filter_destroy (filter);
-			free (filter);
-			config_unload (conf);
-			config_destroy (&libconfig);
-			return -1;
-		}
-
-		if ( strlen (str_val) == 0 ){
-			snprintf (errbuf, CONF_ERRBUF_SIZE, "device rule '%s', empty option 'interface'", filter->name);
-			filter_destroy (filter);
-			free (filter);
-			config_unload (conf);
-			config_destroy (&libconfig);
-			return -1;
-		}
-
-		filter_set_interface (filter, str_val);
-
-		if ( config_setting_lookup_string (filter_setting, "link_type", &str_val) == CONFIG_FALSE ){
-			str_val = NULL;
-		}
-
-		filter_set_link_type (filter, str_val);
+		cnt += j;
 
 		if ( conf->head == NULL ){
-			conf->head = filter;
+			conf->head = conf_iface;
 			conf->tail = conf->head;
 		} else {
-			conf->tail->next = filter;
-			conf->tail = filter;
+			conf->tail->next = conf_iface;
+			conf->tail = conf_iface;
 		}
 	}
 
-	config_destroy (&libconfig); // destroy libconfig object
+cleanup:
+	cfg_free (cfg);
 
-	return filter_cnt;
+	return cnt;
 }
 
 void
 config_unload (struct config *conf)
 {
-	struct config_filter *filter, *filter_next;
+	struct config_iface *iface_iter, *iface_iter_next;
+	struct config_dev *dev_iter, *dev_iter_next;
 
-	filter = conf->head;
+	for ( iface_iter = conf->head; iface_iter != NULL; ){
 
-	while ( filter != NULL ){
-		filter_next = filter->next;
-		filter_destroy (filter);
-		free (filter);
-		filter = filter_next;
+		if ( iface_iter->name != NULL )
+			free (iface_iter->name);
+
+		if ( iface_iter->link_type != NULL )
+			free (iface_iter->link_type);
+
+		for ( dev_iter = iface_iter->dev; dev_iter != NULL; ){
+
+			if ( dev_iter->name != NULL )
+				free (dev_iter->name);
+
+			if ( dev_iter->match != NULL )
+				free (dev_iter->match);
+
+			dev_iter_next = dev_iter->next;
+			free (dev_iter);
+			dev_iter = dev_iter_next;
+		}
+
+		iface_iter_next = iface_iter->next;
+		free (iface_iter);
+		iface_iter = iface_iter_next;
 	}
 
 	conf->head = NULL;
-	conf->tail = conf->head;
+	conf->tail = NULL;
 }
 

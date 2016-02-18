@@ -4,29 +4,37 @@
 #ifndef _CONFIG_H
 #define _CONFIG_H
 
-#include <stdint.h>
-
-#define CONF_FILTER_NAME_MAXLEN 128
-#define CONF_FILTER_MAXCNT 512
-
+#define CONF_DEVNAME_MAXLEN 64
 #define CONF_ERRBUF_SIZE 256
 
-struct config_filter
+enum
+{
+	CONF_IF_PROMISC = 1,
+	CONF_IF_MONITOR = 2
+};
+
+struct config_dev
 {
 	char *name;
-	char *iface;
 	char *match;
+	unsigned long int timeout;
+	struct config_dev *next;
+};
+
+struct config_iface
+{
+	char *name;
 	char *link_type;
-	uint32_t timeout;
-	uint8_t rfmon;
-	uint8_t promisc;
-	struct config_filter *next;
+	int mode;
+	int enabled;
+	struct config_dev *dev;
+	struct config_iface *next;
 };
 
 struct config
 {
-	struct config_filter *head;
-	struct config_filter *tail;
+	struct config_iface *head;
+	struct config_iface *tail;
 };
 
 extern int config_load (struct config *conf, const char *filename, char *errbuf);

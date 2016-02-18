@@ -78,8 +78,9 @@ int
 main (int argc, char *argv[])
 {
 	struct pollfd *poll_fd;
-	struct config kenotaphd_conf;
-	struct config_filter *filter_iter;
+	struct config conf;
+	struct config_iface *confif_iter;
+	struct config_dev *confdev_iter;
 	struct session_data *pcap_session;
 	char *nmsg_buff;
 	struct nmsg_text nmsg_text;
@@ -111,7 +112,7 @@ main (int argc, char *argv[])
 		{ NULL, 0, NULL, 0 }
 	};
 	pid_t pid;
-	int i, c, j, rval, syslog_flags, opt_index, opt_val, filter_cnt, sock, poll_len;
+	int i, c, j, rval, syslog_flags, opt_index, opt_val, filter_cnt, sock, poll_len, link_type;
 
 	sock = -1;
 	poll_fd = NULL;
@@ -125,7 +126,7 @@ main (int argc, char *argv[])
 
 	memset (&nmsg_que, 0, sizeof (struct nmsg_queue));
 	memset (&path_config, 0, sizeof (struct pathname));
-	memset (&kenotaphd_conf, 0, sizeof (struct config));
+	memset (&conf, 0, sizeof (struct config));
 	memset (&opt, 0, sizeof (struct option_data));
 
 	opt.ip_version = AF_UNSPEC;
@@ -220,7 +221,7 @@ main (int argc, char *argv[])
 	rval = chdir (path_config.dir);
 
 	if ( rval == -1 ){
-		fprintf (stderr, "%s: cannot set working directory to '%s': %s\n", argv[0], path_config.dir, strerror (errno));
+		fprintf (stderr, "%s: cannot change directory to '%s': %s\n", argv[0], path_config.dir, strerror (errno));
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -228,10 +229,10 @@ main (int argc, char *argv[])
 	//
 	// Load configuration file
 	//
-	filter_cnt = config_load (&kenotaphd_conf, path_config.base, conf_errbuff);
+	filter_cnt = config_load (&conf, path_config.base, conf_errbuff);
 
 	if ( filter_cnt == -1 ){
-		fprintf (stderr, "%s: cannot load a configuration file '%s': %s\n", argv[0], argv[optind], conf_errbuff);
+		//fprintf (stderr, "%s: cannot load a configuration file '%s': %s\n", argv[0], argv[optind], conf_errbuff);
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	} else if ( filter_cnt == 0 ){
@@ -304,134 +305,139 @@ main (int argc, char *argv[])
 		goto cleanup;
 	}
 
-	for ( i = 0, filter_iter = kenotaphd_conf.head; filter_iter != NULL; i++, filter_iter = filter_iter->next ){
-		int link_type;
+	for ( confif_iter = conf.head; confif_iter != NULL; confif_iter = confif_iter->next ){
 
-		session_data_init (&(pcap_session[i]));
+		if ( ! confif_iter->enabled )
+			continue;
 
-		pcap_session[i].timeout = filter_iter->timeout;
+		for ( i = 0, confdev_iter = confif_iter->dev; confdev_iter != NULL; i++, confdev_iter = confdev_iter->next ){
 
-		pcap_session[i].filter_name = strdup (filter_iter->name);
+			session_data_init (&(pcap_session[i]));
 
-		if ( pcap_session[i].filter_name == NULL ){
-			fprintf (stderr, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
-			exitno = EXIT_FAILURE;
-			goto cleanup;
-		}
+			pcap_session[i].timeout = confdev_iter->timeout;
 
-		pcap_session[i].handle = pcap_create (filter_iter->iface, pcap_errbuff);
+			pcap_session[i].filter_name = strdup (confdev_iter->name);
 
-		if ( pcap_session[i].handle == NULL ){
-			fprintf (stderr, "%s: cannot start packet capture: %s\n", argv[0], pcap_errbuff);
-			exitno = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		rval = pcap_set_rfmon (pcap_session[i].handle, filter_iter->rfmon);
-
-		if ( rval != 0 ){
-			fprintf (stderr, "%s: interface '%s', cannot enable monitor mode: %s\n", argv[0], filter_iter->iface, pcap_geterr (pcap_session[i].handle));
-			exitno = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		rval = pcap_set_promisc (pcap_session[i].handle, filter_iter->promisc);
-
-		if ( rval != 0 ){
-			fprintf (stderr, "%s: interface '%s', cannot enable promiscuous mode: %s\n", argv[0], filter_iter->iface, pcap_geterr (pcap_session[i].handle));
-			exitno = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		rval = pcap_set_timeout (pcap_session[i].handle, SELECT_TIMEOUT_MS);
-
-		if ( rval != 0 ){
-			fprintf (stderr, "%s: interface '%s', cannot set read timeout: %s\n", argv[0], filter_iter->iface, pcap_geterr (pcap_session[i].handle));
-			exitno = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		rval = pcap_setnonblock (pcap_session[i].handle, 1, pcap_errbuff);
-
-		if ( rval == -1 ){
-			fprintf (stderr, "%s: interface '%s', cannot set pcap resource to nonblock: %s\n", argv[0], filter_iter->iface, pcap_errbuff);
-			exitno = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		rval = pcap_activate (pcap_session[i].handle);
-
-		if ( rval != 0 ){
-			fprintf (stderr, "%s: interface '%s', cannot activate packet capture: %s\n", argv[0], filter_iter->iface, pcap_geterr (pcap_session[i].handle));
-			exitno = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		// Set link-layer type from configuration file.
-		if ( filter_iter->link_type != NULL ){
-			link_type = pcap_datalink_name_to_val (filter_iter->link_type);
-
-			if ( link_type == -1 ){
-				fprintf (stderr, "%s: device rule '%s', unknown link-layer type '%s'\n", argv[0], filter_iter->name, filter_iter->link_type);
+			if ( pcap_session[i].filter_name == NULL ){
+				fprintf (stderr, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
-		} else {
-			// If no link-layer type is specified in the configuration file,
-			// use default value. At this point I am sticking with DLTs used by
-			// wireshark on hardware I have available. Different values may
-			// apply to different hardware/driver, therefore more research time
-			// should be put into finding 'best' values.
-			// More information: http://www.tcpdump.org/linktypes.html
-			if ( filter_iter->rfmon ){
-				link_type = DLT_IEEE802_11_RADIO;
+
+			pcap_session[i].handle = pcap_create (confif_iter->name, pcap_errbuff);
+
+			if ( pcap_session[i].handle == NULL ){
+				fprintf (stderr, "%s: cannot use network interface: %s\n", argv[0], pcap_errbuff);
+				exitno = EXIT_FAILURE;
+				goto cleanup;
+			}
+
+			rval = pcap_set_rfmon (pcap_session[i].handle, (confif_iter->mode & CONF_IF_MONITOR));
+
+			if ( rval != 0 ){
+				fprintf (stderr, "%s: interface '%s', cannot enable monitor mode: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
+				exitno = EXIT_FAILURE;
+				goto cleanup;
+			}
+
+			rval = pcap_set_promisc (pcap_session[i].handle, (confif_iter->mode & CONF_IF_PROMISC));
+
+			if ( rval != 0 ){
+				fprintf (stderr, "%s: interface '%s', cannot enable promiscuous mode: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
+				exitno = EXIT_FAILURE;
+				goto cleanup;
+			}
+
+			rval = pcap_set_timeout (pcap_session[i].handle, SELECT_TIMEOUT_MS);
+
+			if ( rval != 0 ){
+				fprintf (stderr, "%s: interface '%s', cannot set read timeout: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
+				exitno = EXIT_FAILURE;
+				goto cleanup;
+			}
+
+			rval = pcap_setnonblock (pcap_session[i].handle, 1, pcap_errbuff);
+
+			if ( rval == -1 ){
+				fprintf (stderr, "%s: interface '%s', cannot set pcap resource to nonblock: %s\n", argv[0], confif_iter->name, pcap_errbuff);
+				exitno = EXIT_FAILURE;
+				goto cleanup;
+			}
+
+			rval = pcap_activate (pcap_session[i].handle);
+
+			if ( rval != 0 ){
+				fprintf (stderr, "%s: interface '%s', cannot activate a packet capture: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
+				exitno = EXIT_FAILURE;
+				goto cleanup;
+			}
+
+			// Set link-layer type from configuration file.
+			if ( confif_iter->link_type != NULL ){
+				link_type = pcap_datalink_name_to_val (confif_iter->link_type);
+
+				if ( link_type == -1 ){
+					fprintf (stderr, "%s: device rule '%s', unknown link-layer type '%s'\n", argv[0], confdev_iter->name, confif_iter->link_type);
+					exitno = EXIT_FAILURE;
+					goto cleanup;
+				}
 			} else {
-				link_type = DLT_EN10MB;
+				// If no link-layer type is specified in the configuration file,
+				// use default value. At this point I am sticking with DLTs used by
+				// wireshark on hardware I have available. Different values may
+				// apply to different hardware/driver, therefore more research time
+				// should be put into finding 'best' values.
+				// More information: http://www.tcpdump.org/linktypes.html
+				if ( confif_iter->mode & CONF_IF_MONITOR ){
+					link_type = DLT_IEEE802_11_RADIO;
+				} else {
+					link_type = DLT_EN10MB;
+				}
 			}
-		}
 
-		rval = pcap_set_datalink (pcap_session[i].handle, link_type);
-
-		if ( rval == -1 ){
-			fprintf (stderr, "%s: interface '%s', cannot set data-link type: %s\n", argv[0], filter_iter->name, pcap_geterr (pcap_session[i].handle));
-			exitno = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		if ( filter_iter->match != NULL ){
-			struct bpf_program bpf_prog;
-
-			rval = pcap_compile (pcap_session[i].handle, &bpf_prog, filter_iter->match, 0, PCAP_NETMASK_UNKNOWN);
+			rval = pcap_set_datalink (pcap_session[i].handle, link_type);
 
 			if ( rval == -1 ){
-				fprintf (stderr, "%s: device rule '%s', cannot compile a packet filter: %s\n", argv[0], filter_iter->name, pcap_geterr (pcap_session[i].handle));
+				fprintf (stderr, "%s: interface '%s', cannot set data-link type: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
 
-			rval = pcap_setfilter (pcap_session[i].handle, &bpf_prog);
+			if ( confdev_iter->match != NULL ){
+				struct bpf_program bpf_prog;
 
-			if ( rval == -1 ){
-				fprintf (stderr, "%s: interface '%s', cannot apply a packet filter '%s': %s\n", argv[0], filter_iter->name, filter_iter->iface, pcap_geterr (pcap_session[i].handle));
+				rval = pcap_compile (pcap_session[i].handle, &bpf_prog, confdev_iter->match, 0, PCAP_NETMASK_UNKNOWN);
+
+				if ( rval == -1 ){
+					fprintf (stderr, "%s: device rule '%s', cannot compile a packet filter: %s\n", argv[0], confdev_iter->name, pcap_geterr (pcap_session[i].handle));
+					exitno = EXIT_FAILURE;
+					goto cleanup;
+				}
+
+				rval = pcap_setfilter (pcap_session[i].handle, &bpf_prog);
+
+				if ( rval == -1 ){
+					fprintf (stderr, "%s: interface '%s', cannot apply a packet filter: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
+					exitno = EXIT_FAILURE;
+					goto cleanup;
+				}
+
+				pcap_freecode (&bpf_prog);
+			}
+
+			pcap_session[i].fd = pcap_get_selectable_fd (pcap_session[i].handle);
+
+			if ( pcap_session[i].fd == -1 ){
+				fprintf (stderr, "%s: interface '%s', cannot obtain a file descriptor\n", argv[0], confif_iter->name);
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
-
-			pcap_freecode (&bpf_prog);
-		}
-
-		pcap_session[i].fd = pcap_get_selectable_fd (pcap_session[i].handle);
-
-		if ( pcap_session[i].fd == -1 ){
-			fprintf (stderr, "%s: interface '%s', cannot obtain a file descriptor\n", argv[0], filter_iter->iface);
-			exitno = EXIT_FAILURE;
-			goto cleanup;
 		}
 	}
 
 	// We no longer need data stored in config structure. All neccessary data
 	// were moved into session_data structure.
-	config_unload (&kenotaphd_conf);
+	config_unload (&conf);
 
 	// Define a poll array length, the length includes space for all pcap fd +
 	// listening socket + accept_max number of client sockets.
@@ -738,7 +744,7 @@ cleanup:
 	if ( sock != -1 )
 		close (sock);
 
-	config_unload (&kenotaphd_conf);
+	config_unload (&conf);
 
 	path_free (&path_config);
 

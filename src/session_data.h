@@ -4,7 +4,6 @@
 #ifndef _SESSION_DATA_H
 #define _SESSION_DATA_H
 
-#include <stdint.h>
 #include <pcap.h>
 
 #include "session_event.h"
@@ -15,7 +14,7 @@ struct session_data
 	pcap_t *handle;
 	char *filter_name;
 	struct session_event evt;
-	uint32_t timeout;
+	unsigned long int timeout;
 };
 
 extern void session_data_init (struct session_data *session_data);
