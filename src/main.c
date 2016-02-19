@@ -233,7 +233,7 @@ main (int argc, char *argv[])
 	filter_cnt = config_load (&conf, path_config.base);
 
 	if ( filter_cnt == -1 ){
-		fprintf (stderr, "%s: cannot load a configuration file '%s': %s\n", argv[0], argv[optind], strerror (errno));
+		fprintf (nstderr, "%s: cannot load a configuration file '%s': %s\n", argv[0], argv[optind], strerror (errno));
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	} else if ( filter_cnt == 0 ){
@@ -248,10 +248,10 @@ main (int argc, char *argv[])
 	//
 	// Daemonize the process if the flag was set
 	//
-	if ( opt.daemon == 1 ){
+	if ( opt.daemon ){
 
 		if ( pipe (pipe_fd) == -1 ){
-			fprintf (stderr, "%s: cannot open pipe: %s\n", argv[0], strerror (errno));
+			fprintf (nstderr, "%s: cannot open pipe: %s\n", argv[0], strerror (errno));
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -259,7 +259,7 @@ main (int argc, char *argv[])
 		pid = fork ();
 
 		if ( pid == -1 ){
-			fprintf (stderr, "%s: cannot daemonize the process (fork failed).\n", argv[0]);
+			fprintf (nstderr, "%s: cannot daemonize the process (fork failed).\n", argv[0]);
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -273,12 +273,12 @@ main (int argc, char *argv[])
 			conf_errbuff[nmsg_len - 1] = '\0';
 
 			if ( nmsg_len == -1 ){
-				fprintf (stderr, "daemonize: noerror\n");
+				fprintf (nstderr, "%s: cannot read from pipe: %s\n", argv[0], strerror (errno));
 				exitno = EXIT_FAILURE;
 			} else if ( nmsg_len == 0 ){
 				exitno = EXIT_SUCCESS;
 			} else {
-				fprintf (stderr, "%s\n", conf_errbuff);
+				fprintf (nstderr, "%s\n", conf_errbuff);
 				exitno = EXIT_FAILURE;
 			}
 
@@ -290,15 +290,16 @@ main (int argc, char *argv[])
 
 			nstderr = fdopen (pipe_fd[1], "w");
 
+			// XXX: leave 'stderr' as is...
 			if ( nstderr == NULL ){
-				fprintf (stderr, "%s: cannot convert fd to FILE structure: %s\n", argv[0], strerror (errno));
+				fprintf (stderr, "%s: fdopen(3) failed: %s\n", argv[0], strerror (errno));
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
 		}
 
 		if ( setsid () == -1 ){
-			fprintf (stderr, "%s: cannot daemonize the process (setsid failed).\n", argv[0]);
+			fprintf (nstderr, "%s: cannot daemonize the process (setsid failed).\n", argv[0]);
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -399,9 +400,17 @@ main (int argc, char *argv[])
 
 			pcap_session[i].timeout = confdev_iter->timeout;
 
-			pcap_session[i].filter_name = strdup (confdev_iter->name);
+			pcap_session[i].iface = strdup (confif_iter->name);
 
-			if ( pcap_session[i].filter_name == NULL ){
+			if ( pcap_session[i].iface == NULL ){
+				fprintf (nstderr, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
+				exitno = EXIT_FAILURE;
+				goto cleanup;
+			}
+
+			pcap_session[i].dev = strdup (confdev_iter->name);
+
+			if ( pcap_session[i].dev == NULL ){
 				fprintf (nstderr, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
 				exitno = EXIT_FAILURE;
 				goto cleanup;
@@ -550,6 +559,8 @@ main (int argc, char *argv[])
 		poll_fd[i].revents = 0;
 	}
 
+	// If nstderr is an open pipe, close it, this will notify a parent process that we are done initializing.
+	// All the code below MUST use syslog function to print data.
 	if ( nstderr != stderr ){
 		fclose (nstderr);
 		nstderr = NULL;
@@ -703,10 +714,10 @@ main (int argc, char *argv[])
 					goto cleanup;
 			}
 
-			if ( opt.verbose )
-				syslog (LOG_INFO, "%s %s", pcap_session[i].filter_name, evt_str);
+			strncpy (nmsg_text.iface, pcap_session[i].iface, NMSG_IF_MAXLEN);
+			nmsg_text.iface[NMSG_IF_MAXLEN] = '\0';
 
-			strncpy (nmsg_text.id, pcap_session[i].filter_name, NMSG_ID_MAXLEN);
+			strncpy (nmsg_text.id, pcap_session[i].dev, NMSG_ID_MAXLEN);
 			nmsg_text.id[NMSG_ID_MAXLEN] = '\0';
 
 			strncpy (nmsg_text.type, evt_str, NMSG_TYPE_MAXLEN);
@@ -721,6 +732,9 @@ main (int argc, char *argv[])
 			}
 
 			nmsg_queue_push (&nmsg_que, nmsg_node);
+
+			if ( opt.verbose )
+				syslog (LOG_INFO, "%s", nmsg_node->msg);
 		}
 
 		nmsg_len = nmsg_queue_serialize (&nmsg_que, &nmsg_buff);
