@@ -9,9 +9,10 @@
 
 enum
 {
-	NMSG_MAXLEN = 254,
+	NMSG_IF_MAXLEN = 127,
 	NMSG_ID_MAXLEN = 127,
-	NMSG_TYPE_MAXLEN = 8
+	NMSG_TYPE_MAXLEN = 8,
+	NMSG_MAXLEN = NMSG_IF_MAXLEN + NMSG_ID_MAXLEN + NMSG_TYPE_MAXLEN
 };
 
 enum
@@ -24,6 +25,7 @@ enum
 
 struct nmsg_text
 {
+	char iface[NMSG_IF_MAXLEN + 1];
 	char id[NMSG_ID_MAXLEN + 1];
 	char type[NMSG_TYPE_MAXLEN + 1];
 };

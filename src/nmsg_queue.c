@@ -19,7 +19,10 @@ nmsg_node_new (const struct nmsg_text *msg_text)
 
 	memset (node, 0, sizeof (struct nmsg_node));
 
-	snprintf (node->msg, sizeof (node->msg), "%s%c%s%c", msg_text->id, NMSG_FLDDELIM, msg_text->type, NMSG_MSGDELIM);
+	snprintf (node->msg, sizeof (node->msg), "%s%c%s%c%s%c",
+				msg_text->iface, NMSG_FLDDELIM,
+				msg_text->id, NMSG_FLDDELIM,
+				msg_text->type, NMSG_MSGDELIM);
 
 	node->len = strlen (msg_text->id) + 1 + strlen (msg_text->type) + 1;
 
@@ -31,13 +34,14 @@ nmsg_node_text (const struct nmsg_node *node, struct nmsg_text *msg_text)
 {
 	char *node_buff;
 	size_t i, len, maxlen;
-	int state;
+	int state, syntax;
 
 	len = 0;
 	maxlen = NMSG_ID_MAXLEN;
 	node_buff = msg_text->id;
 
 	state = NMSG_ECON;
+	syntax = NMSG_ESYN;
 
 	memset (msg_text, 0, sizeof (struct nmsg_text));
 
@@ -47,14 +51,17 @@ nmsg_node_text (const struct nmsg_node *node, struct nmsg_text *msg_text)
 			len = 0;
 			maxlen = NMSG_TYPE_MAXLEN;
 			node_buff = msg_text->type;
+			syntax = NMSG_ESYN;
 			continue;
 		} else if ( node->msg[i] == NMSG_MSGDELIM ){
-			state = NMSG_EOK;
+			state = (syntax == NMSG_EOK)? NMSG_EOK:NMSG_ESYN;
 			break;
 		}
 
 		if ( len > maxlen )
 			continue;
+
+		syntax = NMSG_EOK;
 
 		node_buff[len++] = node->msg[i];
 	}
