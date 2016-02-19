@@ -12,7 +12,8 @@ struct session_data
 {
 	int fd;
 	pcap_t *handle;
-	char *filter_name;
+	char *iface;
+	char *dev;
 	struct session_event evt;
 	unsigned long int timeout;
 };

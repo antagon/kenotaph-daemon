@@ -20,7 +20,10 @@ session_data_free (struct session_data *session_data)
 	if ( session_data->handle != NULL )
 		pcap_close (session_data->handle);
 
-	if ( session_data->filter_name != NULL )
-		free (session_data->filter_name);
+	if ( session_data->iface != NULL )
+		free (session_data->iface);
+
+	if ( session_data->dev != NULL )
+		free (session_data->dev);
 }
 
