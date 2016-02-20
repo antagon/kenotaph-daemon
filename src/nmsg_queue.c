@@ -34,9 +34,9 @@ nmsg_node_new (const struct nmsg_text *msg_text)
 	memset (node, 0, sizeof (struct nmsg_node));
 
 	snprintf (node->msg, sizeof (node->msg), "%s%c%s%c%s%c",
-				msg_text->iface, NMSG_FLDDELIM,
+				msg_text->type, NMSG_MSGDELIM,
 				msg_text->id, NMSG_FLDDELIM,
-				msg_text->type, NMSG_MSGDELIM);
+				msg_text->iface, NMSG_FLDDELIM);
 
 	node->len = strlen (msg_text->id) + 1 + strlen (msg_text->type) + 1;
 
