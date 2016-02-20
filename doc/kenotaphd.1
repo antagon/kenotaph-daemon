@@ -12,16 +12,39 @@ kenotaphd \- detect a presence of a network device
 .I config-file
 .SH DESCRIPTION
 .B kenotaphd
-is a tool for detecting a presence of network devices through means of a packet capture. Both Wired and Wireless networks are supported, assuming appropriate hardware is available. Targetted device is described by a user defined Berkeley Packet Filter, either by its IP address or Hardware address, however the use of BPF allows for higher complexity. A packet capture is done in promiscuous mode, and/or in monitor mode.
+is a tool for detecting a presence of network devices through means of a packet capture. Both Wired and Wireless networks are supported, assuming appropriate hardware is available. Targeted device is described by a user defined Berkeley Packet Filter, either by its IP address or Hardware address, however the use of BPF allows for higher complexity. A packet capture is done in promiscuous mode, and/or in monitor mode.
 
 .B kenotaphd
 is designed to be a 'daemon' program that runs in the background. To communicate with other components, a TCP/IP socket is opened on a defined
 .I PORT
-binded to a
+bound to a
 .I HOSTNAME
-specified as an IP address or as a domain name, latter gets resolved to either IPv4 or IPv6 address. How the domain name gets resolved can be controlled with available options. When a targetted device becomes present on a network, or becomes absent, a notification message is sent to all consumers connected to the socket.
+specified as an IP address or as a domain name, latter gets resolved to either IPv4 or IPv6 address. How the domain name gets resolved can be controlled with available options. When a targeted device becomes present on a network, or becomes absent, a notification message is sent to all consumers connected to the socket.
 
-A notification message is an ASCII formatted string that consists of two fields separated by a semicolon (':'). The first field contains an ID, which corresponds to a name of a device definition found in a configuration file, and the second contains a name of the event. Whole message is terminated with a newline ('\\n') character.
+A notification message is an ASCII
+.RB ( ascii (7))
+formatted string that consists of three fields separated by a white-space character (' ', hex \\x20). The first field contains a name of the event, the second contains an ID, which corresponds to a name of a device rule found in a configuration file, and the third contains a name of a network interface. Whole message is terminated with a newline character ('\\n', hex \\x0A).
+
+Event names are abbreviations of their meaning and are sent thus:
+
+.IP * 3
+Event
+.I BEG
+designates a beginning and is sent after the first packet matching a device's match pattern is captured.
+.IP *
+Event
+.I END
+is sent after a device has not been seen, meaning no packets matching a device's match pattern were captured, for a time period exceeding a defined timeout.
+.IP *
+Event
+.I ERR
+is sent if a network interface gets into faulty state, after that all subsequent triggers of
+.I END
+event are cancelled, unless
+.I BEG
+event is triggered again.
+.PP
+Be aware, that there is absolutely no guarantee that once a faulty interface will be able to recuperate itself from a faulty state and resume in its action. In most cases, only remedy is to restart the program.
 .SH OPTIONS
 .TP
 .B \-4
@@ -57,4 +80,4 @@ When capturing a Wireless traffic in monitor mode, only a traffic from the curre
 .SH AUTHOR
 Dan Antagon <antagon@codeward.org>
 .SH "SEE ALSO"
-.BR kenotaphsched (1)
+.BR kenotaph-sched (1)
