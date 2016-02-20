@@ -51,7 +51,7 @@ struct config
 	struct config_iface *tail;
 };
 
-extern int config_load (struct config *conf, const char *filename);
+extern int config_load (struct config *conf, const char *filename, unsigned long *dev_cnt);
 
 extern void config_unload (struct config *conf);
 

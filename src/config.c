@@ -86,28 +86,29 @@ cfg_validate_device_timeout (cfg_t *cfg, cfg_opt_t *opt)
 }
 
 int
-config_load (struct config *conf, const char *filename)
+config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 {
 	cfg_t *cfg, *cfg_iface, *cfg_dev;
 	struct config_iface *conf_iface;
 	struct config_dev *conf_dev, **conf_dev_tail;
-	int i, j, cnt;
+	int i, j, exitno;
 	char *str_val;
 
-	cnt = 0;
+	if ( dev_cnt != NULL )
+		*dev_cnt = 0;
 
 	cfg = cfg_init (conf_opts, CFGF_NONE);
 
 	cfg_set_validate_func (cfg, "interface|device", cfg_validate_device);
 	cfg_set_validate_func (cfg, "interface|device|timeout", cfg_validate_device_timeout);
 
-	switch ( cfg_parse (cfg, filename) ){
+	exitno = cfg_parse (cfg, filename);
+
+	switch ( exitno ){
 		case CFG_FILE_ERROR:
-			cnt = -1;
 			goto cleanup;
 
 		case CFG_PARSE_ERROR:
-			cnt = -1;
 			goto cleanup;
 	}
 
@@ -117,7 +118,7 @@ config_load (struct config *conf, const char *filename)
 		conf_iface = (struct config_iface*) calloc (1, sizeof (struct config_iface));
 
 		if ( conf_iface == NULL ){
-			cnt = -1;
+			exitno = CFG_FILE_ERROR;
 			goto cleanup;
 		}
 
@@ -125,7 +126,7 @@ config_load (struct config *conf, const char *filename)
 
 		if ( conf_iface->name == NULL ){
 			free (conf_iface);
-			cnt = -1;
+			exitno = CFG_FILE_ERROR;
 			goto cleanup;
 		}
 
@@ -136,7 +137,7 @@ config_load (struct config *conf, const char *filename)
 
 			if ( conf_iface->link_type == NULL ){
 				free (conf_iface);
-				cnt = -1;
+				exitno = CFG_FILE_ERROR;
 				goto cleanup;
 			}
 		}
@@ -165,7 +166,7 @@ config_load (struct config *conf, const char *filename)
 
 			if ( conf_dev == NULL ){
 				free (conf_iface);
-				cnt = -1;
+				exitno = CFG_FILE_ERROR;
 				goto cleanup;
 			}
 
@@ -174,7 +175,7 @@ config_load (struct config *conf, const char *filename)
 			if ( conf_dev->name == NULL ){
 				free (conf_dev);
 				free (conf_iface);
-				cnt = -1;
+				exitno = CFG_FILE_ERROR;
 				goto cleanup;
 			}
 
@@ -183,7 +184,7 @@ config_load (struct config *conf, const char *filename)
 			if ( conf_dev->match == NULL ){
 				free (conf_dev);
 				free (conf_iface);
-				cnt = -1;
+				exitno = CFG_FILE_ERROR;
 				goto cleanup;
 			}
 
@@ -193,7 +194,8 @@ config_load (struct config *conf, const char *filename)
 			conf_dev_tail = &((*conf_dev_tail)->next);
 		}
 
-		cnt += j;
+		if ( dev_cnt != NULL )
+			*dev_cnt = j;
 
 		if ( conf->head == NULL ){
 			conf->head = conf_iface;
@@ -207,7 +209,7 @@ config_load (struct config *conf, const char *filename)
 cleanup:
 	cfg_free (cfg);
 
-	return cnt;
+	return exitno;
 }
 
 void

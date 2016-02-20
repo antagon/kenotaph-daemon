@@ -29,6 +29,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
+#include <confuse.h>
 #include <getopt.h>
 #include <syslog.h>
 #include <unistd.h>
@@ -126,9 +127,9 @@ main (int argc, char *argv[])
 	time_t current_time;
 	struct sigaction sa;
 	struct addrinfo *host_addr, addr_hint;
+	unsigned long filter_cnt;
 	pid_t pid;
-	int i, c, j, rval, syslog_flags, opt_index, opt_val, filter_cnt,
-			sock, poll_len, link_type, pipe_fd[2];
+	int i, c, j, rval, syslog_flags, opt_index, opt_val, sock, poll_len, link_type, pipe_fd[2];
 
 	sock = -1;
 	poll_fd = NULL;
@@ -244,14 +245,21 @@ main (int argc, char *argv[])
 		goto cleanup;
 	}
 
-	filter_cnt = config_load (&conf, path_config.base);
+	rval = config_load (&conf, path_config.base, &filter_cnt);
 
-	if ( filter_cnt == -1 ){
-		fprintf (nstderr, "%s: cannot load a configuration file '%s': %s\n", argv[0], argv[optind], strerror (errno));
-		exitno = EXIT_FAILURE;
-		goto cleanup;
-	} else if ( filter_cnt == 0 ){
-		fprintf (nstderr, "%s: no device rules were found, nothing to do...\n", argv[0]);
+	switch ( rval ){
+		case CFG_FILE_ERROR:
+			fprintf (nstderr, "%s: cannot load a configuration file '%s': %s\n", argv[0], argv[optind], strerror (errno));
+			exitno = EXIT_FAILURE;
+			goto cleanup;
+
+		case CFG_PARSE_ERROR:
+			exitno = EXIT_FAILURE;
+			goto cleanup;
+	}
+
+	if ( filter_cnt == 0 ){
+		fprintf (nstderr, "%s: no device rules defined, nothing to do...\n", argv[0]);
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -582,7 +590,7 @@ main (int argc, char *argv[])
 
 	openlog ("kenotaphd", syslog_flags, LOG_DAEMON);
 
-	syslog (LOG_INFO, "kenotaph-daemon started (loaded device rules: %u)", filter_cnt);
+	syslog (LOG_INFO, "kenotaph-daemon started (loaded device rules: %lu)", filter_cnt);
 
 	if ( opt.tcp_event )
 		syslog (LOG_INFO, "Event notifications available via %s:%s (ACCEPT_MAX: %u)", opt.hostname, opt.port, opt.accept_max);
