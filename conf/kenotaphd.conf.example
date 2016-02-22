@@ -16,6 +16,11 @@ interface wlan0
 	// Use default link_type, otherwise this value would override it.
 	//link_type = "EN10MB"
 
+	// This option is ignored by kenotaph-daemon but it allows external tools
+	// to get an information about a wireless channel on which we want to
+	// listen. This option only makes sense when monitor mode is enabled.
+	channel = 6
+
 	// Enable or disable this interface section. By setting this value to
 	// false, everything inside this section will be ignored.
 	enabled = true

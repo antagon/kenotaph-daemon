@@ -25,7 +25,7 @@
 
 static cfg_opt_t dev_opts[] = {
 	CFG_STR ("match", NULL, CFGF_NODEFAULT),
-	CFG_INT ("timeout", 33, CFGF_NODEFAULT),
+	CFG_INT ("timeout", 0, CFGF_NODEFAULT),
 	CFG_END ()
 };
 
@@ -36,6 +36,9 @@ static cfg_opt_t iface_opts[] = {
 	CFG_STR ("link_type", NULL, CFGF_NODEFAULT),
 	CFG_SEC ("device", dev_opts, CFGF_TITLE | CFGF_MULTI | CFGF_NO_TITLE_DUPES),
 	CFG_FUNC ("include", cfg_include),
+	// This option is ignored by kenotaph-daemon but it allows external tools
+	// get an information about a wireless channel on which we want to listen.
+	CFG_INT ("channel", 0, CFGF_NONE),
 	CFG_END ()
 };
 
