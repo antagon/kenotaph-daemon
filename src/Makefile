@@ -21,7 +21,7 @@ uninstall:
 clean:
 	rm -f *.o $(TARGET)
 
-$(TARGET): main.o config.o session_data.o pathname.o hostport_parser.o nmsg_queue.o
+$(TARGET): main.o config.o session_data.o pathname.o hostport_parser.o nmsg_queue.o pidfile.o
 	$(CC) $(CFLAGS) $^ -o $(TARGET) -lpcap -lconfuse
 
 main.o: main.c
@@ -40,5 +40,8 @@ hostport_parser.o: hostport_parser.c hostport_parser.h
 	$(CC) $(CFLAGS) -c $<
 
 nmsg_queue.o: nmsg_queue.c nmsg_queue.h
+	$(CC) $(CFLAGS) -c $<
+
+pidfile.o: pidfile.c pidfile.h
 	$(CC) $(CFLAGS) -c $<
 

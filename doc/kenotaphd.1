@@ -12,7 +12,7 @@ kenotaphd \- detect a presence of a network device
 .I config-file
 .SH DESCRIPTION
 .B kenotaphd
-is a tool for detecting a presence of network devices through means of a packet capture. Both Wired and Wireless networks are supported, assuming appropriate hardware is available. Targeted device is described by a user defined Berkeley Packet Filter, either by its IP address or Hardware address, however the use of BPF allows for higher complexity. A packet capture is done in promiscuous mode, and/or in monitor mode.
+is a tool for detecting a presence of network devices through means of a packet capture. Both Wired and Wireless networks are supported, assuming appropriate hardware is available. Targeted device is identified by a user defined Berkeley Packet Filter, either by its IP address or Hardware address, however the use of BPF allows for higher complexity. A packet capture is done in promiscuous mode, and/or in monitor mode.
 
 .B kenotaphd
 is designed to be a 'daemon' program that runs in the background. To communicate with other processes, a TCP/IP socket is opened on a defined
@@ -66,6 +66,10 @@ run as a daemon
 accept maximum of
 .I NUM
 concurrent client connections
+.TP
+.BI "\-P, \-\-pid-file="FILE
+create a pid file
+.I FILE
 .TP
 .B "\-V, \-\-verbose"
 increase verbosity

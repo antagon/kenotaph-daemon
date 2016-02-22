@@ -36,9 +36,10 @@
 
 #include "kenotaphd.h"
 #include "config.h"
+#include "pidfile.h"
 #include "pathname.h"
-#include "session_data.h"
 #include "nmsg_queue.h"
+#include "session_data.h"
 #include "hostport_parser.h"
 
 static const unsigned int SELECT_TIMEOUT_MS = 700;
@@ -51,6 +52,9 @@ struct option_data
 	uint32_t ip_version;
 	char port[PORT_MAX_LEN];
 	char hostname[HOST_NAME_MAX];
+	char pid_file[FILENAME_MAX];
+	uint8_t has_pidfile;
+	uint8_t prot_pidfile;
 	uint8_t verbose;
 	uint8_t tcp_event;
 	uint8_t daemon;
@@ -64,6 +68,7 @@ static struct option opt_long[] = {
 	{ "hostname", required_argument, NULL, 't' },
 	{ "daemon", no_argument, NULL, 'd' },
 	{ "accept-max", required_argument, NULL, 'm' },
+	{ "pid-file", required_argument, NULL, 'P' },
 	{ "verbose", no_argument, NULL, 'V' },
 	{ "help", no_argument, NULL, 'h' },
 	{ "version", no_argument, NULL, 'v' },
@@ -81,6 +86,7 @@ kenotaphd_help (const char *p)
 					 "  -d, --daemon                  run as a daemon\n"
 					 "  -m, --accept-max=NUM          accept maximum of NUM concurrent client connections\n"
 					 "  -V, --verbose                 increase verbosity\n"
+					 "  -P, --pid-file=FILE           create a pid file FILE\n"
 					 "  -h, --help                    show usage information\n"
 					 "  -v, --version                 show version information\n"
 					 , p);
@@ -151,7 +157,7 @@ main (int argc, char *argv[])
 	opt.ip_version = AF_UNSPEC;
 	opt.accept_max = ACCEPT_MAX;
 
-	while ( (c = getopt_long (argc, argv, "46t:dm:Vhv", opt_long, &opt_index)) != -1 ){
+	while ( (c = getopt_long (argc, argv, "46t:dm:P:Vhv", opt_long, &opt_index)) != -1 ){
 		switch ( c ){
 			case 'd':
 				opt.daemon = 1;
@@ -193,6 +199,26 @@ main (int argc, char *argv[])
 				}
 				break;
 
+			case 'P':
+				nmsg_len = strlen (optarg) + 1;
+
+				if ( nmsg_len > sizeof (opt.pid_file) ){
+					fprintf (nstderr, "%s: pid file name is too long\n", argv[0]);
+					exitno = EXIT_FAILURE;
+					goto cleanup;
+				}
+
+				strncpy (opt.pid_file, optarg, nmsg_len);
+				opt.pid_file[nmsg_len - 1] = '\0';
+
+				opt.has_pidfile = 1;
+
+				// Set pid file protection flag.
+				// In case of an error when we have to jump to cleanup, make sure we do
+				// not delete a file which was not created by this process.
+				opt.prot_pidfile = 1;
+				break;
+
 			case 'V':
 				opt.verbose = 1;
 				break;
@@ -226,6 +252,41 @@ main (int argc, char *argv[])
 		fprintf (nstderr, "%s: daemon not binded to any hostname and port. Use '--help' to see usage information.\n", argv[0]);
 		exitno = EXIT_FAILURE;
 		goto cleanup;
+	}
+
+	if ( opt.has_pidfile ){
+		pid = pidfile_read (opt.pid_file);
+
+		if ( pid == -1 ){
+			fprintf (nstderr, "%s: invalid value inside of a pid file '%s'\n", argv[0], opt.pid_file);
+			exitno = EXIT_FAILURE;
+			goto cleanup;
+		}
+
+		// Check pid
+		if ( (pid > 0) && (pid != getpid ()) ){
+			errno = 0;
+			rval = kill (pid, 0);
+
+			if ( rval == 0 ){
+				fprintf (nstderr, "%s: an instance of a program is already running (pid: %u)\n", argv[0], pid);
+				exitno = EXIT_FAILURE;
+				goto cleanup;
+			} else if ( (rval == -1) && (errno != ESRCH) ){
+				fprintf (nstderr, "%s: cannot determine if a process exists: %s\n", argv[0], strerror (errno));
+				exitno = EXIT_FAILURE;
+				goto cleanup;
+			}
+		}
+
+		if ( pidfile_write (opt.pid_file) == -1 ){
+			fprintf (nstderr, "%s: cannot create a pid file '%s': %s\n", argv[0], opt.pid_file, strerror (errno));
+			exitno = EXIT_FAILURE;
+			goto cleanup;
+		}
+
+		// Unset pid file protection flag.
+		opt.prot_pidfile = 0;
 	}
 
 	// Change working directory to match the dirname of the config file.
@@ -553,6 +614,10 @@ main (int argc, char *argv[])
 	// were moved into session_data structure.
 	config_unload (&conf);
 
+	// TODO
+	// Drop privileges here...
+	//
+
 	// Define a poll array length, the length includes space for all pcap fd +
 	// listening socket + accept_max number of client sockets.
 	poll_len = filter_cnt + 1 + opt.accept_max;
@@ -762,7 +827,7 @@ main (int argc, char *argv[])
 		nmsg_len = nmsg_queue_serialize (&nmsg_que, &nmsg_buff);
 
 		if ( nmsg_len == -1 ){
-			syslog (LOG_ERR, "%s: cannot allocate memory: %s\n", argv[0], strerror (errno));
+			syslog (LOG_ERR, "%s: cannot serialize enqued data: %s\n", argv[0], strerror (errno));
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -827,6 +892,9 @@ cleanup:
 	config_unload (&conf);
 
 	path_free (&path_config);
+
+	if ( opt.has_pidfile && !opt.prot_pidfile )
+		unlink (opt.pid_file);
 
 	return exitno;
 }
