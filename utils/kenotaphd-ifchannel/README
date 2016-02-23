@@ -1,0 +1,8 @@
+kenotaph-ifchannel <config-file>
+
+This utility may be helpful for scripts that try to change a channel for a
+network interface. Instead of writting elaborate regular expression to parse a
+configuration file, this utility prints out all interfaces found in a
+configuration file, which are set in monitor mode, and the option 'channel' is
+set to nonzero value.
+
