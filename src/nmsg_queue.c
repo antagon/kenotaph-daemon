@@ -41,6 +41,7 @@ nmsg_node_new (const struct nmsg_text *msg_text)
 	return node;
 }
 
+#if 0
 int
 nmsg_node_text (const struct nmsg_node *node, struct nmsg_text *msg_text)
 {
@@ -80,6 +81,7 @@ nmsg_node_text (const struct nmsg_node *node, struct nmsg_text *msg_text)
 
 	return state;
 }
+#endif
 
 void
 nmsg_queue_push (struct nmsg_queue *res, struct nmsg_node *node)
@@ -120,6 +122,7 @@ nmsg_queue_serialize (struct nmsg_queue *res, char **buff)
 	return bcp;
 }
 
+#if 0
 ssize_t
 nmsg_queue_unserialize (struct nmsg_queue *res, const char *buff, size_t buff_len)
 {
@@ -158,6 +161,7 @@ nmsg_queue_unserialize (struct nmsg_queue *res, const char *buff, size_t buff_le
 
 	return i;
 }
+#endif
 
 void
 nmsg_queue_delete (struct nmsg_queue *res, struct nmsg_node **node)
