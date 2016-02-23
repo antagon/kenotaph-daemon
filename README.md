@@ -1,4 +1,4 @@
-# H1 kenotaph-daemon
+# kenotaph-daemon
 
 Homepage: http://codeward.org/software/kenotaph-daemon/
 
