@@ -36,7 +36,10 @@ interface wlan0
 		timeout = 900
 	}
 
-	// ... define other devices
+	// ... define other devices.
+
+	// ... or include them from elsewhere.
+	include ("externaldevice.conf")
 }
 
 /*
