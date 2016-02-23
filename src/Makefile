@@ -2,7 +2,6 @@
 # Copyright (c) 2016, CodeWard.org
 #
 
-CC = gcc
 CFLAGS = -std=gnu99 -O2 -pedantic -Wall -ggdb
 
 TARGET = kenotaphd
