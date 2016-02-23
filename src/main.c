@@ -86,8 +86,8 @@ kenotaphd_help (const char *p)
 					 "  -t, --hostname=HOSTNAME:PORT  bind socket to hostname and port\n"
 					 "  -d, --daemon                  run as a daemon\n"
 					 "  -m, --accept-max=NUM          accept maximum of NUM concurrent client connections\n"
-					 "  -V, --verbose                 increase verbosity\n"
 					 "  -P, --pid-file=FILE           create a pid file FILE\n"
+					 "  -V, --verbose                 increase verbosity\n"
 					 "  -h, --help                    show usage information\n"
 					 "  -v, --version                 show version information\n"
 					 , p);
