@@ -257,41 +257,6 @@ main (int argc, char *argv[])
 		goto cleanup;
 	}
 
-	if ( opt.has_pidfile ){
-		pid = pidfile_read (opt.pid_file);
-
-		if ( pid == -1 ){
-			fprintf (nstderr, "%s: invalid value inside of a pid file '%s'\n", argv[0], opt.pid_file);
-			exitno = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		// Check pid
-		if ( (pid > 0) && (pid != getpid ()) ){
-			errno = 0;
-			rval = kill (pid, 0);
-
-			if ( rval == 0 ){
-				fprintf (nstderr, "%s: an instance of a program is already running (pid: %u)\n", argv[0], pid);
-				exitno = EXIT_FAILURE;
-				goto cleanup;
-			} else if ( (rval == -1) && (errno != ESRCH) ){
-				fprintf (nstderr, "%s: cannot determine if a process exists: %s\n", argv[0], strerror (errno));
-				exitno = EXIT_FAILURE;
-				goto cleanup;
-			}
-		}
-
-		if ( pidfile_write (opt.pid_file) == -1 ){
-			fprintf (nstderr, "%s: cannot create a pid file '%s': %s\n", argv[0], opt.pid_file, strerror (errno));
-			exitno = EXIT_FAILURE;
-			goto cleanup;
-		}
-
-		// Unset pid file protection flag.
-		opt.prot_pidfile = 0;
-	}
-
 	// Change working directory to match the dirname of the config file.
 	rval = path_split (argv[optind], &path_config);
 
@@ -396,6 +361,42 @@ main (int argc, char *argv[])
 		freopen ("/dev/null", "w", stdout);
 		freopen ("/dev/null", "w", stderr);
 		syslog_flags = LOG_PID;
+	}
+
+	// Create a pid file
+	if ( opt.has_pidfile ){
+		pid = pidfile_read (opt.pid_file);
+
+		if ( pid == -1 ){
+			fprintf (nstderr, "%s: invalid value inside of a pid file '%s'\n", argv[0], opt.pid_file);
+			exitno = EXIT_FAILURE;
+			goto cleanup;
+		}
+
+		// Pid file found, check if the process is running...
+		if ( (pid > 0) && (pid != getpid ()) ){
+			errno = 0;
+			rval = kill (pid, 0);
+
+			if ( rval == 0 ){
+				fprintf (nstderr, "%s: an instance of a program is already running (pid: %u)\n", argv[0], pid);
+				exitno = EXIT_FAILURE;
+				goto cleanup;
+			} else if ( (rval == -1) && (errno != ESRCH) ){
+				fprintf (nstderr, "%s: cannot determine if a process exists: %s\n", argv[0], strerror (errno));
+				exitno = EXIT_FAILURE;
+				goto cleanup;
+			}
+		}
+
+		if ( pidfile_write (opt.pid_file) == -1 ){
+			fprintf (nstderr, "%s: cannot create a pid file '%s': %s\n", argv[0], opt.pid_file, strerror (errno));
+			exitno = EXIT_FAILURE;
+			goto cleanup;
+		}
+
+		// Unset pid file protection flag.
+		opt.prot_pidfile = 0;
 	}
 
 	//
