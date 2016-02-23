@@ -156,6 +156,8 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 		else
 			conf_iface->enabled = 0;
 
+		conf_iface->channel = cfg_getint (cfg_iface, "channel");
+
 		if ( cfg_size (cfg_iface, "device") == 0 )
 			conf_iface->enabled = 0;
 

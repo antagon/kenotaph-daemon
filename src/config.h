@@ -41,6 +41,7 @@ struct config_iface
 	char *link_type;
 	int mode;
 	int enabled;
+	unsigned long int channel;
 	struct config_dev *dev;
 	struct config_iface *next;
 };
