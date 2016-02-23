@@ -45,6 +45,7 @@
 static const unsigned int SELECT_TIMEOUT_MS = 700;
 static const unsigned int ACCEPT_MAX = 32;
 static const unsigned int LISTEN_QUEUE_LEN = 8;
+static const unsigned int BPF_OPTIMIZE = 1;
 
 struct option_data
 {
@@ -115,12 +116,12 @@ main (int argc, char *argv[])
 	struct config_dev *confdev_iter;
 	struct session_data *pcap_session;
 	struct config conf;
-	char *nmsg_buff;
 	struct nmsg_text nmsg_text;
 	struct nmsg_node *nmsg_node;
 	struct nmsg_queue nmsg_que;
 	ssize_t nmsg_len;
 	struct option_data opt;
+	char *nmsg_buff;
 	char conf_errbuff[CONF_ERRBUF_SIZE];
 	char pcap_errbuff[PCAP_ERRBUF_SIZE];
 	struct pathname path_config;
@@ -130,11 +131,13 @@ main (int argc, char *argv[])
 #endif
 	const u_char *pkt_data;
 	struct pcap_pkthdr *pkt_header;
+	struct bpf_program bpf_prog;
 	time_t current_time;
 	struct sigaction sa;
 	struct addrinfo *host_addr, addr_hint;
 	unsigned long filter_cnt;
 	pid_t pid;
+	bpf_u_int32 if_netaddr, if_netmask;
 	int i, c, j, rval, syslog_flags, opt_index, opt_val, sock, poll_len, link_type, pipe_fd[2];
 
 	sock = -1;
@@ -534,7 +537,7 @@ main (int argc, char *argv[])
 			rval = pcap_setnonblock (pcap_session[i].handle, 1, pcap_errbuff);
 
 			if ( rval == -1 ){
-				fprintf (nstderr, "%s: interface '%s', cannot set pcap resource to nonblock: %s\n", argv[0], confif_iter->name, pcap_errbuff);
+				fprintf (nstderr, "%s: interface '%s', cannot set nonblocking: %s\n", argv[0], confif_iter->name, pcap_errbuff);
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
@@ -578,27 +581,44 @@ main (int argc, char *argv[])
 				goto cleanup;
 			}
 
-			if ( confdev_iter->match != NULL ){
-				struct bpf_program bpf_prog;
+			if_netmask = PCAP_NETMASK_UNKNOWN;
 
-				rval = pcap_compile (pcap_session[i].handle, &bpf_prog, confdev_iter->match, 0, PCAP_NETMASK_UNKNOWN);
-
-				if ( rval == -1 ){
-					fprintf (nstderr, "%s: device rule '%s', cannot compile a packet filter: %s\n", argv[0], confdev_iter->name, pcap_geterr (pcap_session[i].handle));
-					exitno = EXIT_FAILURE;
-					goto cleanup;
-				}
-
-				rval = pcap_setfilter (pcap_session[i].handle, &bpf_prog);
+			// Obtain IP address of a network and the netmask.
+			// This only makes sense if we are not capturing in monitor mode.
+			if ( !(confif_iter->mode & CONF_IF_MONITOR) ){
+				rval = pcap_lookupnet (confif_iter->name, &if_netaddr, &if_netmask, pcap_errbuff);
 
 				if ( rval == -1 ){
-					fprintf (nstderr, "%s: interface '%s', cannot apply a packet filter: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
-					exitno = EXIT_FAILURE;
-					goto cleanup;
+					// This is a tricky part, if pcap_lookupnet returns an
+					// error, should we die with error or simply set
+					// PCAP_NETMASK_UNKNOWN and carry on, like we do now?  If
+					// netmask is not known to pcap_compile, bpf's broadcast
+					// directive will not work and pcap_compile will fail.
+					// Also, does it makes sense to capture on an interface
+					// without an IP address, if the interface is not in
+					// monitor mode?
+					if_netmask = PCAP_NETMASK_UNKNOWN;
 				}
-
-				pcap_freecode (&bpf_prog);
 			}
+
+			rval = pcap_compile (pcap_session[i].handle, &bpf_prog, confdev_iter->match, BPF_OPTIMIZE, if_netmask);
+
+			if ( rval == -1 ){
+				fprintf (nstderr, "%s: device rule '%s', cannot compile a packet filter: %s\n", argv[0], confdev_iter->name, pcap_geterr (pcap_session[i].handle));
+				exitno = EXIT_FAILURE;
+				goto cleanup;
+			}
+
+			rval = pcap_setfilter (pcap_session[i].handle, &bpf_prog);
+
+			if ( rval == -1 ){
+				pcap_freecode (&bpf_prog);
+				fprintf (nstderr, "%s: interface '%s', cannot apply a packet filter: %s\n", argv[0], confif_iter->name, pcap_geterr (pcap_session[i].handle));
+				exitno = EXIT_FAILURE;
+				goto cleanup;
+			}
+
+			pcap_freecode (&bpf_prog);
 
 			pcap_session[i].fd = pcap_get_selectable_fd (pcap_session[i].handle);
 
