@@ -775,13 +775,22 @@ main (int argc, char *argv[])
 			if ( (poll_fd[i].revents & POLLIN) || (poll_fd[i].revents & POLLERR) ){
 				rval = pcap_next_ex (pcap_session[i].handle, &pkt_header, &pkt_data);
 
-				if ( rval == 1 ){
-					if ( pcap_session[i].evt.ts == 0 )
-						pcap_session[i].evt.type = SE_BEG;
+				switch ( rval ){
+					case -1:
+						syslog (LOG_ALERT, "interface '%s', cannot read a packet: %s", pcap_session[i].iface, pcap_geterr (pcap_session[i].handle));
+						pcap_session[i].evt.type = SE_ERR;
+						break;
 
-					pcap_session[i].evt.ts = pkt_header->ts.tv_sec;
-				} else if ( rval < 0 ){
-					pcap_session[i].evt.type = SE_ERR;
+					case 0:
+						// Timeout... this should not happen!
+						break;
+
+					case 1:
+						if ( pcap_session[i].evt.ts == 0 )
+							pcap_session[i].evt.type = SE_BEG;
+
+						pcap_session[i].evt.ts = pkt_header->ts.tv_sec;
+						break;
 				}
 			}
 
