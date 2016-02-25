@@ -1,3 +1,18 @@
+version 1.0.1
+-------------
+
+* Log interface errors. In case we cannot read a packet from a queue, it is
+usually connected with interface error. In these cases we send out ERR event
+but nothing is written in syslog. This version fixes that.
+
+* In configuration, option 'enabled = false' did not cause the section to be
+ignored.
+
+* In configuration, do a proper cleanup of used resources if a configuration
+fails.
+
+* If a pid file was an empty file, undefined behaviour could occur.
+
 version 1.0.0
 -------------
 
