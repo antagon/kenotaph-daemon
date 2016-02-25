@@ -30,6 +30,7 @@ pidfile_read (const char *filename)
 {
 	FILE *file;
 	pid_t pid;
+	int rval;
 
 	file = fopen (filename, "r");
 
@@ -37,8 +38,9 @@ pidfile_read (const char *filename)
 	if ( file == NULL )
 		return 0;
 
-	// Error
-	if ( fscanf (file, "%d", &pid) == 0 )
+	rval = fscanf (file, "%d", &pid);
+
+	if ( rval < 1 || rval == EOF )
 		pid = -1;
 
 	fclose (file);
