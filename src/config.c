@@ -88,13 +88,42 @@ cfg_validate_device_timeout (cfg_t *cfg, cfg_opt_t *opt)
 	return 0;
 }
 
+static void
+config_dev_free (struct config_dev *conf_dev)
+{
+	if ( conf_dev->name != NULL )
+		free (conf_dev->name);
+
+	if ( conf_dev->match != NULL )
+		free (conf_dev->match);
+}
+
+static void
+config_iface_free (struct config_iface *conf_iface)
+{
+	struct config_dev *dev_iter, *dev_iter_next;
+
+	if ( conf_iface->name != NULL )
+		free (conf_iface->name);
+
+	if ( conf_iface->link_type != NULL )
+		free (conf_iface->link_type);
+
+	for ( dev_iter = conf_iface->dev; dev_iter != NULL; ){
+		dev_iter_next = dev_iter->next;
+		config_dev_free (dev_iter);
+		free (dev_iter);
+		dev_iter = dev_iter_next;
+	}
+}
+
 int
 config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 {
 	cfg_t *cfg, *cfg_iface, *cfg_dev;
 	struct config_iface *conf_iface;
 	struct config_dev *conf_dev, **conf_dev_tail;
-	int i, j, exitno;
+	int i, j, exitno, sec_enabled;
 	char *str_val;
 
 	if ( dev_cnt != NULL )
@@ -118,12 +147,28 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 	for ( i = 0; i < cfg_size (cfg, "interface"); i++ ){
 		cfg_iface = cfg_getnsec (cfg, "interface", i);
 
+		// Check if this section is enabled and if there is at least one device
+		// defined, if not skip this interface.
+		if ( cfg_getbool (cfg_iface, "enabled") == cfg_true )
+			sec_enabled = 1;
+		else
+			sec_enabled = 0;
+
+		if ( cfg_size (cfg_iface, "device") == 0 )
+			sec_enabled = 0;
+
+		if ( ! sec_enabled )
+			continue;
+
 		conf_iface = (struct config_iface*) calloc (1, sizeof (struct config_iface));
 
 		if ( conf_iface == NULL ){
 			exitno = CFG_FILE_ERROR;
 			goto cleanup;
 		}
+
+		// If we've got here, it means the section is enabled.
+		conf_iface->enabled = 1;
 
 		conf_iface->name = strdup (cfg_title (cfg_iface));
 
@@ -139,6 +184,7 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 			conf_iface->link_type = strdup (str_val);
 
 			if ( conf_iface->link_type == NULL ){
+				config_iface_free (conf_iface);
 				free (conf_iface);
 				exitno = CFG_FILE_ERROR;
 				goto cleanup;
@@ -151,15 +197,7 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 		if ( cfg_getbool (cfg_iface, "monitor_mode") == cfg_true )
 			conf_iface->mode |= CONF_IF_MONITOR;
 
-		if ( cfg_getbool (cfg_iface, "enabled") == cfg_true )
-			conf_iface->enabled = 1;
-		else
-			conf_iface->enabled = 0;
-
 		conf_iface->channel = cfg_getint (cfg_iface, "channel");
-
-		if ( cfg_size (cfg_iface, "device") == 0 )
-			conf_iface->enabled = 0;
 
 		conf_dev_tail = &(conf_iface->dev);
 
@@ -170,6 +208,7 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 			conf_dev = (struct config_dev*) calloc (1, sizeof (struct config_dev));
 
 			if ( conf_dev == NULL ){
+				config_iface_free (conf_iface);
 				free (conf_iface);
 				exitno = CFG_FILE_ERROR;
 				goto cleanup;
@@ -179,6 +218,7 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 
 			if ( conf_dev->name == NULL ){
 				free (conf_dev);
+				config_iface_free (conf_iface);
 				free (conf_iface);
 				exitno = CFG_FILE_ERROR;
 				goto cleanup;
@@ -187,7 +227,9 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 			conf_dev->match = strdup (cfg_getstr (cfg_dev, "match"));
 
 			if ( conf_dev->match == NULL ){
+				config_dev_free (conf_dev);
 				free (conf_dev);
+				config_iface_free (conf_iface);
 				free (conf_iface);
 				exitno = CFG_FILE_ERROR;
 				goto cleanup;
@@ -221,30 +263,10 @@ void
 config_unload (struct config *conf)
 {
 	struct config_iface *iface_iter, *iface_iter_next;
-	struct config_dev *dev_iter, *dev_iter_next;
 
 	for ( iface_iter = conf->head; iface_iter != NULL; ){
-
-		if ( iface_iter->name != NULL )
-			free (iface_iter->name);
-
-		if ( iface_iter->link_type != NULL )
-			free (iface_iter->link_type);
-
-		for ( dev_iter = iface_iter->dev; dev_iter != NULL; ){
-
-			if ( dev_iter->name != NULL )
-				free (dev_iter->name);
-
-			if ( dev_iter->match != NULL )
-				free (dev_iter->match);
-
-			dev_iter_next = dev_iter->next;
-			free (dev_iter);
-			dev_iter = dev_iter_next;
-		}
-
 		iface_iter_next = iface_iter->next;
+		config_iface_free (iface_iter);
 		free (iface_iter);
 		iface_iter = iface_iter_next;
 	}
