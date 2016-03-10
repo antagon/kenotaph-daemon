@@ -29,6 +29,7 @@ struct session_data
 	char *iface;
 	char *dev;
 	struct session_event evt;
+	struct session_event evt_old;
 	unsigned long int timeout;
 };
 

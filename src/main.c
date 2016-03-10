@@ -779,7 +779,7 @@ main (int argc, char *argv[])
 					case -1:
 						syslog (LOG_ALERT, "interface '%s', cannot read a packet: %s", pcap_session[i].iface, pcap_geterr (pcap_session[i].handle));
 
-						if ( pcap_session[i].evt.type == SE_BEG )
+						if ( pcap_session[i].evt_old.type == SE_BEG )
 							pcap_session[i].evt.type = SE_ERR;
 						break;
 
@@ -811,17 +811,23 @@ main (int argc, char *argv[])
 
 				case SE_BEG:
 					evt_str = "BEG";
+					pcap_session[i].evt_old.type = pcap_session[i].evt.type;
+					pcap_session[i].evt_old.ts = pcap_session[i].evt.ts;
 					pcap_session[i].evt.type = SE_NUL;
 					break;
 
 				case SE_END:
 					evt_str = "END";
+					pcap_session[i].evt_old.type = pcap_session[i].evt.type;
+					pcap_session[i].evt_old.ts = pcap_session[i].evt.ts;
 					pcap_session[i].evt.type = SE_NUL;
 					pcap_session[i].evt.ts = 0;
 					break;
 
 				case SE_ERR:
 					evt_str = "ERR";
+					pcap_session[i].evt_old.type = pcap_session[i].evt.type;
+					pcap_session[i].evt_old.ts = pcap_session[i].evt.ts;
 					pcap_session[i].evt.type = SE_NUL;
 					pcap_session[i].evt.ts = 0;
 					break;
