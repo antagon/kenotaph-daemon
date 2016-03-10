@@ -242,7 +242,7 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 		}
 
 		if ( dev_cnt != NULL )
-			*dev_cnt = j;
+			(*dev_cnt)++;
 
 		if ( conf->head == NULL ){
 			conf->head = conf_iface;
