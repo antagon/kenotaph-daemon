@@ -129,6 +129,9 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 	if ( dev_cnt != NULL )
 		*dev_cnt = 0;
 
+	conf_iface = NULL;
+	conf_dev = NULL;
+
 	cfg = cfg_init (conf_opts, CFGF_NONE);
 
 	cfg_set_validate_func (cfg, "interface|device", cfg_validate_device);
@@ -173,7 +176,6 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 		conf_iface->name = strdup (cfg_title (cfg_iface));
 
 		if ( conf_iface->name == NULL ){
-			free (conf_iface);
 			exitno = CFG_FILE_ERROR;
 			goto cleanup;
 		}
@@ -184,8 +186,6 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 			conf_iface->link_type = strdup (str_val);
 
 			if ( conf_iface->link_type == NULL ){
-				config_iface_free (conf_iface);
-				free (conf_iface);
 				exitno = CFG_FILE_ERROR;
 				goto cleanup;
 			}
@@ -208,8 +208,6 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 			conf_dev = (struct config_dev*) calloc (1, sizeof (struct config_dev));
 
 			if ( conf_dev == NULL ){
-				config_iface_free (conf_iface);
-				free (conf_iface);
 				exitno = CFG_FILE_ERROR;
 				goto cleanup;
 			}
@@ -217,9 +215,6 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 			conf_dev->name = strdup (cfg_title (cfg_dev));
 
 			if ( conf_dev->name == NULL ){
-				free (conf_dev);
-				config_iface_free (conf_iface);
-				free (conf_iface);
 				exitno = CFG_FILE_ERROR;
 				goto cleanup;
 			}
@@ -227,10 +222,6 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 			conf_dev->match = strdup (cfg_getstr (cfg_dev, "match"));
 
 			if ( conf_dev->match == NULL ){
-				config_dev_free (conf_dev);
-				free (conf_dev);
-				config_iface_free (conf_iface);
-				free (conf_iface);
 				exitno = CFG_FILE_ERROR;
 				goto cleanup;
 			}
@@ -242,7 +233,7 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 		}
 
 		if ( dev_cnt != NULL )
-			(*dev_cnt)++;
+			*dev_cnt = cfg_size (cfg_iface, "device");
 
 		if ( conf->head == NULL ){
 			conf->head = conf_iface;
@@ -253,7 +244,20 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 		}
 	}
 
+	conf_iface = NULL;
+	conf_dev = NULL;
+
 cleanup:
+	if ( conf_iface != NULL ){
+		config_iface_free (conf_iface);
+		free (conf_iface);
+	}
+
+	if ( conf_dev != NULL ){
+		config_dev_free (conf_dev);
+		free (conf_dev);
+	}
+
 	cfg_free (cfg);
 
 	return exitno;
