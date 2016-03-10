@@ -17,6 +17,8 @@ fails.
 network (event BEG was sent). Before this change, all device rules configured
 on a faulty interface were 'leaked' to connected clients.
 
+* Support BPF's 'broadcast' directive.
+
 version 1.0.0
 -------------
 
