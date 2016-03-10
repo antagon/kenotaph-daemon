@@ -13,6 +13,10 @@ fails.
 
 * If a pid file was an empty file, undefined behaviour could occur.
 
+* Trigger the event ERR only for device rules which were recently seen on a
+network (event BEG was sent). Before this change, all device rules configured
+on a faulty interface were 'leaked' to connected clients.
+
 version 1.0.0
 -------------
 
