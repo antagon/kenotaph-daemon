@@ -31,8 +31,8 @@ device's match pattern is captured.
 a device's match pattern were captured, for a time period exceeding a defined
 timeout.
 
-* Event ERR is sent if a network interface gets into faulty state, after that all 
-subsequent triggers of END event are cancelled, unless BEG event is triggered
-again.
+* Event  ERR  is  sent for each device rule, upon a network interface error, for
+which the event BEG was recently sent. After that all subsequent triggers of
+the event END are cancelled, unless the event BEG is triggered again.
 
 *kenotaph-daemon* is free software licensed under **GPLv3**.

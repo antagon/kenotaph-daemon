@@ -38,11 +38,13 @@ is sent after a device has not been seen, meaning no packets matching a device's
 .IP *
 Event
 .I ERR
-is sent if a network interface gets into faulty state, after that all subsequent triggers of
-.I END
-event are cancelled, unless
+is sent for each device rule, upon a network interface error, for which the event
 .I BEG
-event is triggered again.
+was recently sent. After that all subsequent triggers of the event
+.I END
+are cancelled, unless the event
+.I BEG
+is triggered again.
 .PP
 Be aware, that there is absolutely no guarantee that once a faulty interface will be able to recuperate itself from a faulty state and resume in its action. In most cases, only remedy is to restart the program.
 .SH OPTIONS
