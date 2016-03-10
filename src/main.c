@@ -778,7 +778,9 @@ main (int argc, char *argv[])
 				switch ( rval ){
 					case -1:
 						syslog (LOG_ALERT, "interface '%s', cannot read a packet: %s", pcap_session[i].iface, pcap_geterr (pcap_session[i].handle));
-						pcap_session[i].evt.type = SE_ERR;
+
+						if ( pcap_session[i].evt.type == SE_BEG )
+							pcap_session[i].evt.type = SE_ERR;
 						break;
 
 					case 0:
