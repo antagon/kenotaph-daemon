@@ -22,7 +22,7 @@ main (int argc, char *argv[])
 	memset (&path_config, 0, sizeof (struct pathname));
 
 	if ( argc < 2 ){
-		fprintf (stdout, "Usage: %s <config-file>\n\nRead a configuration file and print all interfaces which are set in a monitor mode have a channel defined.\n", argv[0]);
+		fprintf (stdout, "Usage: %s <config-file>\n\nList all interfaces set in a monitor mode with a channel defined.\n", argv[0]);
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
