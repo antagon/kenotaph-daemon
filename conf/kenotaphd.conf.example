@@ -27,6 +27,9 @@ interface wlan0
 
 	device mydevice1
 	{
+		// Enable or disabled this device rule.
+		enabled = true
+
 		// Berkeley Packet Filter describing how to match packets belonging to
 		// a device.
 		match = "ether host aa:bb:cc:dd:ee:f1"

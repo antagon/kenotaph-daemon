@@ -25,6 +25,7 @@
 
 static cfg_opt_t dev_opts[] = {
 	CFG_STR ("match", NULL, CFGF_NODEFAULT),
+	CFG_BOOL ("enabled", cfg_true, CFGF_NONE),
 	CFG_INT ("timeout", 0, CFGF_NODEFAULT),
 	CFG_END ()
 };
@@ -123,7 +124,7 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 	cfg_t *cfg, *cfg_iface, *cfg_dev;
 	struct config_iface *conf_iface;
 	struct config_dev *conf_dev, **conf_dev_tail;
-	int i, j, exitno, sec_enabled;
+	int i, j, exitno;
 	char *str_val;
 
 	if ( dev_cnt != NULL )
@@ -152,15 +153,8 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 
 		// Check if this section is enabled and if there is at least one device
 		// defined, if not skip this interface.
-		if ( cfg_getbool (cfg_iface, "enabled") == cfg_true )
-			sec_enabled = 1;
-		else
-			sec_enabled = 0;
-
-		if ( cfg_size (cfg_iface, "device") == 0 )
-			sec_enabled = 0;
-
-		if ( ! sec_enabled )
+		if ( cfg_getbool (cfg_iface, "enabled") == cfg_false
+						|| cfg_size (cfg_iface, "device") == 0 )
 			continue;
 
 		conf_iface = (struct config_iface*) calloc (1, sizeof (struct config_iface));
@@ -169,9 +163,6 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 			exitno = CFG_FILE_ERROR;
 			goto cleanup;
 		}
-
-		// If we've got here, it means the section is enabled.
-		conf_iface->enabled = 1;
 
 		conf_iface->name = strdup (cfg_title (cfg_iface));
 
@@ -205,6 +196,9 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 		for ( j = 0; j < cfg_size (cfg_iface, "device"); j++ ){
 			cfg_dev = cfg_getnsec (cfg_iface, "device", j);
 
+			if ( cfg_getbool (cfg_dev, "enabled") == cfg_false )
+				continue;
+
 			conf_dev = (struct config_dev*) calloc (1, sizeof (struct config_dev));
 
 			if ( conf_dev == NULL ){
@@ -228,12 +222,12 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 
 			conf_dev->timeout = cfg_getint (cfg_dev, "timeout");
 
+			if ( dev_cnt != NULL )
+				*dev_cnt = *dev_cnt + 1;
+
 			*conf_dev_tail = conf_dev;
 			conf_dev_tail = &((*conf_dev_tail)->next);
 		}
-
-		if ( dev_cnt != NULL )
-			*dev_cnt = cfg_size (cfg_iface, "device");
 
 		if ( conf->head == NULL ){
 			conf->head = conf_iface;

@@ -1,12 +1,16 @@
 version 1.0.1
 -------------
 
-* Log interface errors. In case we cannot read a packet from a queue, it is
-usually connected with interface error. In these cases we send out ERR event
-but nothing is written in syslog. This version fixes that.
+* Log interface errors, in case we cannot read a packet from the queue. In
+this case ERR event is send out, but nothing was written in syslog. This
+version fixes that.
 
-* In configuration, option 'enabled = false' did not cause the section to be
-ignored.
+* In configuration, in the interface section, setting option 'enabled' to
+false did not cause the section to be disabled.
+
+* New option 'enabled' for device section. This way configuration generators
+can enable or disable given device rule without actually deleting it from its
+output. By default this option is set to true.
 
 * In configuration, do a proper cleanup of used resources if a configuration
 fails.
@@ -17,7 +21,8 @@ fails.
 network (event BEG was sent). Before this change, all device rules configured
 on a faulty interface were 'leaked' to connected clients.
 
-* Support BPF's 'broadcast' directive.
+* Support BPF's 'broadcast' directive by detecting interface's netmask. If no
+IP address is assigned, compilation will fail.
 
 version 1.0.0
 -------------
