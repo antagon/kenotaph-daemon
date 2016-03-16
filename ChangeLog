@@ -9,17 +9,17 @@ version fixes that.
 false did not cause the section to be disabled.
 
 * New option 'enabled' for device section. This way configuration generators
-can enable or disable given device rule without actually deleting it from its
-output. By default this option is set to true.
+can enable or disable given device section without actually deleting it from
+its output. By default this option is set to true.
 
 * In configuration, do a proper cleanup of used resources if a configuration
 fails.
 
 * If a pid file was an empty file, undefined behaviour could occur.
 
-* Trigger the event ERR only for device rules which were recently seen on a
-network (event BEG was sent). Before this change, all device rules configured
-on a faulty interface were 'leaked' to connected clients.
+* Trigger the event ERR only for device sections which were recently seen on a
+network (event BEG was sent). Before this change, all device sections
+configured on a faulty interface were 'leaked' to connected clients.
 
 * Support BPF's 'broadcast' directive by detecting interface's netmask. If no
 IP address is assigned, compilation will fail.
@@ -43,8 +43,8 @@ source code. By default, promiscuous mode is enabled.
 
 * Send notifications to single client in burst mode.
 
-* Do not define interface name as an option for each device rule, instead, use
-an adjacent section of which all device rules are part of. All interface
-related options (monitor_mode, promisc_mode, link_type) are now part of this
-section and have to be specified only once for each interface.
+* Do not define interface name as an option for each device section, instead,
+use an adjacent section of which all device sections are part of. All
+interface related options (monitor_mode, promisc_mode, link_type) are now part
+of this section and have to be specified only once for each interface.
 

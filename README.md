@@ -18,8 +18,8 @@ connected to the socket.
 A notification message is an *ASCII* formatted string that consists of three
 fields separated by a white-space character (' ', hex \x20). The first field
 contains a name of the event, the second contains an ID, which corresponds to a
-name of a device rule found in a configuration file, and the third contains a
-name of a network interface. Whole message is terminated with a newline
+name of a device section found in a configuration file, and the third contains
+a name of a network interface. Whole message is terminated with a newline
 character ('\n', hex \x0A).
 
 Event names are abbreviations of their meaning and are sent thus:
@@ -31,8 +31,8 @@ device's match pattern is captured.
 a device's match pattern were captured, for a time period exceeding a defined
 timeout.
 
-* Event  ERR  is  sent for each device rule, upon a network interface error, for
-which the event BEG was recently sent. After that all subsequent triggers of
-the event END are cancelled, unless the event BEG is triggered again.
+* Event  ERR  is  sent for each device section, upon a network interface error,
+for which the event BEG was recently sent. After that all subsequent triggers
+of the event END are cancelled, unless the event BEG is triggered again.
 
 *kenotaph-daemon* is free software licensed under **GPLv3**.

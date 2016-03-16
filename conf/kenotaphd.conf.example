@@ -27,7 +27,7 @@ interface wlan0
 
 	device mydevice1
 	{
-		// Enable or disabled this device rule.
+		// Enable or disabled this device section.
 		enabled = true
 
 		// Berkeley Packet Filter describing how to match packets belonging to

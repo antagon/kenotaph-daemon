@@ -288,7 +288,7 @@ main (int argc, char *argv[])
 	}
 
 	if ( filter_cnt == 0 ){
-		fprintf (nstderr, "%s: no device rules defined, nothing to do...\n", argv[0]);
+		fprintf (nstderr, "%s: no device sections found, nothing to do...\n", argv[0]);
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
@@ -553,7 +553,7 @@ main (int argc, char *argv[])
 				link_type = pcap_datalink_name_to_val (confif_iter->link_type);
 
 				if ( link_type == -1 ){
-					fprintf (nstderr, "%s: device rule '%s', unknown link-layer type '%s'\n", argv[0], confdev_iter->name, confif_iter->link_type);
+					fprintf (nstderr, "%s: device section '%s', unknown link-layer type '%s'\n", argv[0], confdev_iter->name, confif_iter->link_type);
 					exitno = EXIT_FAILURE;
 					goto cleanup;
 				}
@@ -602,7 +602,7 @@ main (int argc, char *argv[])
 			rval = pcap_compile (pcap_session[i].handle, &bpf_prog, confdev_iter->match, BPF_OPTIMIZE, if_netmask);
 
 			if ( rval == -1 ){
-				fprintf (nstderr, "%s: device rule '%s', cannot compile a packet filter: %s\n", argv[0], confdev_iter->name, pcap_geterr (pcap_session[i].handle));
+				fprintf (nstderr, "%s: device section '%s', cannot compile a packet filter: %s\n", argv[0], confdev_iter->name, pcap_geterr (pcap_session[i].handle));
 				exitno = EXIT_FAILURE;
 				goto cleanup;
 			}
@@ -673,7 +673,7 @@ main (int argc, char *argv[])
 
 	openlog ("kenotaphd", syslog_flags, LOG_DAEMON);
 
-	syslog (LOG_INFO, "kenotaph-daemon started (loaded device rules: %lu)", filter_cnt);
+	syslog (LOG_INFO, "kenotaph-daemon started (device sections: %lu)", filter_cnt);
 
 	if ( opt.tcp_event )
 		syslog (LOG_INFO, "Event notifications available via %s:%s (ACCEPT_MAX: %u)", opt.hostname, opt.port, opt.accept_max);
