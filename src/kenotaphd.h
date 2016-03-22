@@ -20,7 +20,7 @@
 
 #define KENOTAPHD_VER_MAJOR 1
 #define KENOTAPHD_VER_MINOR 0
-#define KENOTAPHD_VER_PATCH 1
+#define KENOTAPHD_VER_PATCH 2
 
 #endif
 
