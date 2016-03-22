@@ -96,7 +96,9 @@ kenotaphd_help (const char *p)
 static void
 kenotaphd_version (const char *p)
 {
-	fprintf (stdout, "%s %d.%d.%d\n%s\n", p, KENOTAPHD_VER_MAJOR, KENOTAPHD_VER_MINOR, KENOTAPHD_VER_PATCH, pcap_lib_version ());
+	fprintf (stdout, "%s %d.%d.%d\n%s\nlibconfuse version %s\n", p,
+						KENOTAPHD_VER_MAJOR, KENOTAPHD_VER_MINOR, KENOTAPHD_VER_PATCH,
+						pcap_lib_version (), confuse_version);
 }
 
 static void
