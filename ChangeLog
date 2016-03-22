@@ -1,3 +1,9 @@
+version 1.0.2
+-------------
+
+* BUGFIX: when capturing on multiple interfaces, device sections defined in
+one interface were overwritten by device sections defined in the next.
+
 version 1.0.1
 -------------
 

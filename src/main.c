@@ -476,9 +476,9 @@ main (int argc, char *argv[])
 		goto cleanup;
 	}
 
-	for ( confif_iter = conf.head; confif_iter != NULL; confif_iter = confif_iter->next ){
+	for ( i = 0, confif_iter = conf.head; confif_iter != NULL; confif_iter = confif_iter->next ){
 
-		for ( i = 0, confdev_iter = confif_iter->dev; confdev_iter != NULL; i++, confdev_iter = confdev_iter->next ){
+		for ( confdev_iter = confif_iter->dev; confdev_iter != NULL; i++, confdev_iter = confdev_iter->next ){
 
 			session_data_init (&(pcap_session[i]));
 
