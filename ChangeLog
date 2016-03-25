@@ -4,6 +4,15 @@ version 1.0.2
 * BUGFIX: when capturing on multiple interfaces, device sections defined in
 one interface were overwritten by device sections defined in the next.
 
+* Make arguments '-t, --hostname', '-m, --accept-max', '-P, --pid-file', '-4',
+'-6' adjustable via configuration file. If these options are set in a
+configuration file and defined as arguments at the same time, value of an
+argument takes precedence.
+
+* Print libconfuse version information.
+
+* Validate string options, if they do not have an empty value.
+
 version 1.0.1
 -------------
 
