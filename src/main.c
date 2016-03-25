@@ -51,13 +51,13 @@ struct option_data
 {
 	uint32_t accept_max;
 	uint32_t ip_version;
-	char port[PORT_MAX_LEN];
 	char hostname[HOST_NAME_MAX];
-	char pid_file[FILENAME_MAX];
+	char port[PORT_MAX_LEN];
+	char pidfile[FILENAME_MAX];
+	uint8_t has_hostname;
 	uint8_t has_pidfile;
 	uint8_t prot_pidfile;
 	uint8_t verbose;
-	uint8_t tcp_event;
 	uint8_t daemon;
 };
 
@@ -79,7 +79,7 @@ static struct option opt_long[] = {
 static void
 kenotaphd_help (const char *p)
 {
-	fprintf (stdout, "Usage: %s [OPTIONS] -t HOSTNAME:PORT <config-file>\n\n"
+	fprintf (stdout, "Usage: %s [OPTIONS] <config-file>\n\n"
 					 "Options:\n"
 					 "  -4                            resolve hostname to IPv4 address\n"
 					 "  -6                            resolve hostname to IPv6 address\n"
@@ -156,11 +156,8 @@ main (int argc, char *argv[])
 	memset (&nmsg_que, 0, sizeof (struct nmsg_queue));
 	memset (&path_config, 0, sizeof (struct pathname));
 	memset (&conf, 0, sizeof (struct config));
-	memset (&opt, 0, sizeof (struct option_data));
 	memset (&addr_hint, 0, sizeof (struct addrinfo));
-
-	opt.ip_version = AF_UNSPEC;
-	opt.accept_max = ACCEPT_MAX;
+	memset (&opt, 0, sizeof (struct option_data));
 
 	while ( (c = getopt_long (argc, argv, "46t:dm:P:Vhv", opt_long, &opt_index)) != -1 ){
 		switch ( c ){
@@ -177,7 +174,7 @@ main (int argc, char *argv[])
 					goto cleanup;
 				}
 
-				opt.tcp_event = 1;
+				opt.has_hostname = 1;
 				break;
 
 			case '4':
@@ -207,14 +204,14 @@ main (int argc, char *argv[])
 			case 'P':
 				nmsg_len = strlen (optarg) + 1;
 
-				if ( nmsg_len > sizeof (opt.pid_file) ){
+				if ( nmsg_len > sizeof (opt.pidfile) ){
 					fprintf (nstderr, "%s: pid file name is too long\n", argv[0]);
 					exitno = EXIT_FAILURE;
 					goto cleanup;
 				}
 
-				strncpy (opt.pid_file, optarg, nmsg_len);
-				opt.pid_file[nmsg_len - 1] = '\0';
+				strncpy (opt.pidfile, optarg, nmsg_len);
+				opt.pidfile[nmsg_len - 1] = '\0';
 
 				opt.has_pidfile = 1;
 
@@ -253,12 +250,6 @@ main (int argc, char *argv[])
 		goto cleanup;
 	}
 
-	if ( opt.tcp_event == 0 ){
-		fprintf (nstderr, "%s: daemon not binded to any hostname and port. Use '--help' to see usage information.\n", argv[0]);
-		exitno = EXIT_FAILURE;
-		goto cleanup;
-	}
-
 	// Change working directory to match the dirname of the config file.
 	rval = path_split (argv[optind], &path_config);
 
@@ -289,14 +280,70 @@ main (int argc, char *argv[])
 			goto cleanup;
 	}
 
+	// No longer needed, free the resources
+	path_free (&path_config);
+
 	if ( filter_cnt == 0 ){
 		fprintf (nstderr, "%s: no device sections found, nothing to do...\n", argv[0]);
 		exitno = EXIT_FAILURE;
 		goto cleanup;
 	}
 
-	// No longer needed, free the resources
-	path_free (&path_config);
+	// Load hostname and port from a configuration file, if it was not
+	// specified as an argument.
+	if ( ! opt.has_hostname ){
+
+		if ( conf.hostname != NULL && conf.port != NULL ){
+			strncpy (opt.hostname, conf.hostname, sizeof (opt.hostname));
+			opt.hostname[sizeof (opt.hostname) - 1] = '\0';
+
+			strncpy (opt.port, conf.port, sizeof (opt.port));
+			opt.port[sizeof (opt.port) - 1] = '\0';
+
+			opt.has_hostname = 1;
+		}
+	}
+
+	if ( ! opt.has_hostname ){
+		fprintf (nstderr, "%s: daemon not binded to any hostname and port. Use '--help' to see usage information.\n", argv[0]);
+		exitno = EXIT_FAILURE;
+		goto cleanup;
+	}
+
+	// Load path to pidfile from a configuration file, if it was not specified
+	// as an argument.
+	if ( ! opt.has_pidfile ){
+
+		if ( conf.pidfile != NULL ){
+			strncpy (opt.pidfile, conf.pidfile, sizeof (opt.pidfile));
+			opt.pidfile[sizeof (opt.pidfile) - 1] = '\0';
+			opt.has_pidfile = 1;
+			opt.prot_pidfile = 1;
+		}
+	}
+
+	// Load accept max value from a configuration file, if it was not specified
+	// as an argument.
+	if ( ! opt.accept_max )
+		opt.accept_max = (conf.accept_max > 0)? conf.accept_max:ACCEPT_MAX;
+
+	// Load ip version from a configuration file, if it was not specified as an
+	// argument.
+	if ( ! opt.ip_version ){
+		switch ( conf.ip_version ){
+			case 0:
+				opt.ip_version = AF_UNSPEC;
+				break;
+
+			case 4:
+				opt.ip_version = AF_INET;
+				break;
+
+			case 6:
+				opt.ip_version = AF_INET6;
+				break;
+		}
+	}
 
 	//
 	// Daemonize the process if the flag was set
@@ -367,10 +414,10 @@ main (int argc, char *argv[])
 
 	// Create a pid file
 	if ( opt.has_pidfile ){
-		pid = pidfile_read (opt.pid_file);
+		pid = pidfile_read (opt.pidfile);
 
 		if ( pid == -1 ){
-			fprintf (nstderr, "%s: invalid value inside of a pid file '%s'\n", argv[0], opt.pid_file);
+			fprintf (nstderr, "%s: invalid value inside of a pid file '%s'\n", argv[0], opt.pidfile);
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -391,8 +438,8 @@ main (int argc, char *argv[])
 			}
 		}
 
-		if ( pidfile_write (opt.pid_file) == -1 ){
-			fprintf (nstderr, "%s: cannot create a pid file '%s': %s\n", argv[0], opt.pid_file, strerror (errno));
+		if ( pidfile_write (opt.pidfile) == -1 ){
+			fprintf (nstderr, "%s: cannot create a pid file '%s': %s\n", argv[0], opt.pidfile, strerror (errno));
 			exitno = EXIT_FAILURE;
 			goto cleanup;
 		}
@@ -677,7 +724,7 @@ main (int argc, char *argv[])
 
 	syslog (LOG_INFO, "kenotaph-daemon started (device sections: %lu)", filter_cnt);
 
-	if ( opt.tcp_event )
+	if ( opt.has_hostname )
 		syslog (LOG_INFO, "Event notifications available via %s:%s (ACCEPT_MAX: %u)", opt.hostname, opt.port, opt.accept_max);
 
 	//
@@ -931,7 +978,7 @@ cleanup:
 	path_free (&path_config);
 
 	if ( opt.has_pidfile && !opt.prot_pidfile )
-		unlink (opt.pid_file);
+		unlink (opt.pidfile);
 
 	return exitno;
 }
