@@ -45,6 +45,11 @@ static cfg_opt_t iface_opts[] = {
 
 static cfg_opt_t conf_opts[] = {
 	CFG_SEC ("interface", iface_opts, CFGF_TITLE | CFGF_MULTI | CFGF_NO_TITLE_DUPES),
+	CFG_STR ("hostname", NULL, CFGF_NODEFAULT),
+	CFG_STR ("port", NULL, CFGF_NODEFAULT),
+	CFG_STR ("pidfile", NULL, CFGF_NODEFAULT),
+	CFG_INT ("ip_version", 0, CFGF_NONE),
+	CFG_INT ("accept_max", 0, CFGF_NONE),
 	CFG_FUNC ("include", cfg_include),
 	CFG_END ()
 };
@@ -83,6 +88,51 @@ cfg_validate_device_timeout (cfg_t *cfg, cfg_opt_t *opt)
 
 	if ( val <= 0 ){
 		cfg_error (cfg, "option 'timeout' must be >0");
+		return -1;
+	}
+
+	return 0;
+}
+
+static int
+cfg_validate_strlen (cfg_t *cfg, cfg_opt_t *opt)
+{
+	char *val;
+
+	val = cfg_opt_getnstr (opt, 0);
+
+	if ( strlen (val) == 0 ){
+		cfg_error (cfg, "value is an empty string");
+		return -1;
+	}
+
+	return 0;
+}
+
+static int
+cfg_validate_accept_max (cfg_t *cfg, cfg_opt_t *opt)
+{
+	long int val;
+
+	val = cfg_opt_getnint (opt, 0);
+
+	if ( val <= 0 ){
+		cfg_error (cfg, "option 'accept_max' must be >0");
+		return -1;
+	}
+
+	return 0;
+}
+
+static int
+cfg_validate_ip_version (cfg_t *cfg, cfg_opt_t *opt)
+{
+	long int val;
+
+	val = cfg_opt_getnint (opt, 0);
+
+	if ( val != 4 && val != 6 ){
+		cfg_error (cfg, "option 'ip_version' must be equal to 4 or 6");
 		return -1;
 	}
 
@@ -135,7 +185,14 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 
 	cfg = cfg_init (conf_opts, CFGF_NONE);
 
+	cfg_set_validate_func (cfg, "hostname", cfg_validate_strlen);
+	cfg_set_validate_func (cfg, "port", cfg_validate_strlen);
+	cfg_set_validate_func (cfg, "pidfile", cfg_validate_strlen);
+	cfg_set_validate_func (cfg, "accept_max", cfg_validate_accept_max);
+	cfg_set_validate_func (cfg, "ip_version", cfg_validate_ip_version);
+	cfg_set_validate_func (cfg, "interface|link_type", cfg_validate_strlen);
 	cfg_set_validate_func (cfg, "interface|device", cfg_validate_device);
+	cfg_set_validate_func (cfg, "interface|device|match", cfg_validate_strlen);
 	cfg_set_validate_func (cfg, "interface|device|timeout", cfg_validate_device_timeout);
 
 	exitno = cfg_parse (cfg, filename);
@@ -147,6 +204,42 @@ config_load (struct config *conf, const char *filename, unsigned long *dev_cnt)
 		case CFG_PARSE_ERROR:
 			goto cleanup;
 	}
+
+	str_val = cfg_getstr (cfg, "hostname");
+
+	if ( str_val != NULL ){
+		conf->hostname = strdup (str_val);
+
+		if ( conf->hostname == NULL ){
+			exitno = CFG_FILE_ERROR;
+			goto cleanup;
+		}
+	}
+
+	str_val = cfg_getstr (cfg, "port");
+
+	if ( str_val != NULL ){
+		conf->port = strdup (str_val);
+
+		if ( conf->port == NULL ){
+			exitno = CFG_FILE_ERROR;
+			goto cleanup;
+		}
+	}
+
+	str_val = cfg_getstr (cfg, "pidfile");
+
+	if ( str_val != NULL ){
+		conf->pidfile = strdup (str_val);
+
+		if ( conf->pidfile == NULL ){
+			exitno = CFG_FILE_ERROR;
+			goto cleanup;
+		}
+	}
+
+	conf->accept_max = cfg_getint (cfg, "accept_max");
+	conf->ip_version = cfg_getint (cfg, "ip_version");
 
 	for ( i = 0; i < cfg_size (cfg, "interface"); i++ ){
 		cfg_iface = cfg_getnsec (cfg, "interface", i);
@@ -267,6 +360,21 @@ config_unload (struct config *conf)
 		config_iface_free (iface_iter);
 		free (iface_iter);
 		iface_iter = iface_iter_next;
+	}
+
+	if ( conf->hostname != NULL ){
+		free (conf->hostname);
+		conf->hostname = NULL;
+	}
+
+	if ( conf->port != NULL ){
+		free (conf->port);
+		conf->port = NULL;
+	}
+
+	if ( conf->pidfile != NULL ){
+		free (conf->pidfile);
+		conf->pidfile = NULL;
 	}
 
 	conf->head = NULL;

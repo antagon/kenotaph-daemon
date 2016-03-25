@@ -40,13 +40,18 @@ struct config_iface
 	char *name;
 	char *link_type;
 	int mode;
-	unsigned long int channel;
+	int channel;
 	struct config_dev *dev;
 	struct config_iface *next;
 };
 
 struct config
 {
+	char *hostname;
+	char *port;
+	char *pidfile;
+	int ip_version;
+	unsigned long int accept_max;
 	struct config_iface *head;
 	struct config_iface *tail;
 };
