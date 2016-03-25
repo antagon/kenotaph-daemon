@@ -3,7 +3,7 @@
  */
 
 // Bind to address...
-hostname = localhost
+hostname = "localhost"
 
 // ... on port.
 port = 8888
