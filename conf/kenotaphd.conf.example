@@ -2,6 +2,21 @@
  * Example configuration file for kenotaph-daemon.
  */
 
+// Bind to address...
+hostname = localhost
+
+// ... on port.
+port = 8888
+
+// Resolve hostname to IPv6 address.
+ip_version = 6
+
+// Accept maximum number of concurrent connections.
+accept_max = 64
+
+// Create a pidfile.
+pidfile = "/run/kenotaphd.pid"
+
 /*
  * Capture on Wireless interface in monitor mode.
  */
